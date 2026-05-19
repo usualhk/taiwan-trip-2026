@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>台灣 — 2026.07</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@200;300;400&family=Noto+Serif+JP:wght@200;300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #f4f2ef;
+  --surface:  #faf9f7;
+  --white:    #ffffff;
+  --ink:      #3a3835;
+  --ink-2:    #6a6760;
+  --ink-3:    #1e1d1b;
+  --ink-4:    #d4d1cc;
+  --accent:   #5c7a52;
+  --red:      #a03020;
+  --blue:     #3a5275;
+  --fnt:      'Noto Sans TC', sans-serif;
+  --fnt-jp:   'Noto Serif JP', serif;
+  --fnt-mono: 'DM Mono', monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--fnt);
+  font-weight: 300;
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0.01em;
+}
+button, input, select { font-family: var(--fnt); }
+
+/* ─── HEADER ─────────────────────────────── */
+header {
+  background: var(--ink);
+  color: #fff;
+  padding: 18px 72px 0;
+  position: relative;
+  overflow: hidden;
+}
+header::after {
+  content: '旅';
+  font-family: var(--fnt-jp);
+  font-weight: 200;
+  font-size: 180px;
+  color: rgba(255,255,255,0.03);
+  position: absolute;
+  right: 36px;
+  top: -30px;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+}
+.h-eyebrow {
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 6px;
+}
+.h-title {
+  font-family: var(--fnt-jp);
+  font-size: 36px;
+  font-weight: 200;
+  letter-spacing: 4px;
+  line-height: 1;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.h-subtitle {
+  font-family: var(--fnt-mono);
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: 4px;
+  color: #fff;
+  margin-bottom: 14px;
+}
+.nav {
+  display: flex;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  margin-top: 4px;
+}
+.nav-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.55);
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  padding: 12px 0;
+  margin-right: 44px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.2s, border-color 0.2s;
+  cursor: pointer;
+  position: relative;
+  bottom: -1px;
+}
+.nav-btn:hover { color: #fff; }
+.nav-btn.active { color: #fff; border-bottom-color: var(--accent); }
+
+/* ─── LAYOUT ─────────────────────────────── */
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
+
+.lbl {
+  font-family: var(--fnt-mono);
+  font-size: 8px;
+  font-weight: 300;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 20px;
+  margin-top: 52px;
+}
+.lbl:first-child { margin-top: 0; }
+
+/* ─── FORM ───────────────────────────────── */
+.form-block { margin-bottom: 52px; }
+.row { display: grid; gap: 12px; margin-bottom: 12px; }
+.row.c3 { grid-template-columns: 1fr 1fr 100px; }
+.row.c4 { grid-template-columns: 1fr 1fr 1fr auto; }
+.fg { display: flex; flex-direction: column; gap: 7px; }
+.fg label {
+  font-family: var(--fnt-mono);
+  font-size: 8px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.fg input, .fg select {
+  background: var(--white);
+  border: 1px solid var(--ink-4);
+  border-radius: 0;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--ink);
+  appearance: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  outline: none;
+}
+.fg input::placeholder { color: var(--ink-3); }
+.fg input:focus, .fg select:focus { border-color: var(--ink-2); }
+.btn-add {
+  background: var(--ink);
+  color: var(--bg);
+  border: none;
+  padding: 10px 22px;
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+  align-self: flex-end;
+  font-family: var(--fnt-mono);
+}
+.btn-add:hover { opacity: 0.65; }
+
+/* ─── FILTER ─────────────────────────────── */
+.filter-row { display: flex; gap: 6px; margin-bottom: 4px; }
+.f-btn {
+  background: none;
+  border: 1px solid var(--ink-4);
+  padding: 4px 14px;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 1.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.f-btn:hover { border-color: var(--ink-2); color: var(--ink-2); }
+.f-btn.active { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.sort-lnk {
+  display: inline-block;
+  margin-top: 10px;
+  margin-bottom: 24px;
+  background: none;
+  border: none;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+.sort-lnk:hover { opacity: 0.55; }
+.sort-row { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+
+/* ─── SPOT LIST ──────────────────────────── */
+.spot-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  gap: 18px;
+  align-items: start;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--ink-4);
+}
+.spot-row:first-child { border-top: 1px solid var(--ink-4); }
+.spot-idx {
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  color: var(--ink-3);
+  padding-top: 3px;
+  letter-spacing: 0.5px;
+}
+.spot-name {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+.spot-metas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  color: var(--ink-3);
+  letter-spacing: 0.5px;
+  align-items: center;
+}
+.tag {
+  font-family: var(--fnt-mono);
+  font-size: 8px;
+  font-weight: 300;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.tag-景點  { color: var(--blue);   border-color: rgba(58,82,117,0.35);  background: rgba(58,82,117,0.05);  }
+.tag-食物  { color: var(--red);    border-color: rgba(160,48,32,0.35);  background: rgba(160,48,32,0.04);  }
+.tag-咖啡店 { color: var(--accent); border-color: rgba(92,122,82,0.35); background: rgba(92,122,82,0.05);  }
+.tag-購物  { color: #6b4a8a;       border-color: rgba(107,74,138,0.35); background: rgba(107,74,138,0.04); }
+.tag-其他  { color: var(--ink-3);  border-color: var(--ink-4);          background: transparent; }
+.tag-酒店  { color: var(--accent); border-color: rgba(92,122,82,0.4);   background: rgba(92,122,82,0.06);  }
+.tag-航班  { color: var(--blue);   border-color: rgba(58,82,117,0.4);   background: rgba(58,82,117,0.06);  }
+.tag-酒吧   { color: #7a2855;      border-color: rgba(122,40,85,0.35);  background: rgba(122,40,85,0.05);  }
+.tag-肥仔水 { color: #c47a1a;      border-color: rgba(196,122,26,0.4);  background: rgba(196,122,26,0.07); }
+.spot-acts { display: flex; gap: 4px; padding-top: 2px; }
+.ic {
+  background: none;
+  border: 1px solid var(--ink-4);
+  padding: 5px 10px;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 0.5px;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ic:hover { border-color: var(--ink); color: var(--ink); }
+.ic.del:hover { border-color: var(--red); color: var(--red); }
+.empty {
+  padding: 72px 0;
+  text-align: center;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  letter-spacing: 4px;
+  color: var(--ink-3);
+}
+
+/* ─── ITINERARY ──────────────────────────── */
+.itin-day { margin-bottom: 60px; }
+.itin-hd {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ink);
+}
+.day-pill {
+  font-family: var(--fnt-mono);
+  font-size: 8px;
+  font-weight: 300;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 4px 10px;
+}
+.day-datestr {
+  font-family: var(--fnt-jp);
+  font-size: 16px;
+  font-weight: 200;
+  color: var(--ink);
+  letter-spacing: 1px;
+}
+.day-route {
+  margin-left: auto;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  background: none;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.day-route:hover { background: var(--ink); color: var(--bg); }
+.day-map-wrap {
+  margin: 16px 0 20px;
+  border: 1px solid var(--ink-4);
+  overflow: hidden;
+  background: var(--surface);
+}
+.day-map-iframe { display: block; width: 100%; height: 320px; border: 0; }
+@media (max-width: 680px) {
+  .day-map-iframe { height: 240px; }
+}
+.tl-item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--ink-4);
+}
+.tl-item.hotel { border-left: 2px solid rgba(92,122,82,0.4); padding-left: 14px; }
+.tl-item.flight { border-left: 2px solid rgba(58,82,117,0.4); padding-left: 14px; }
+.tl-name {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.tl-item.hotel .tl-name { color: var(--accent); font-weight: 300; }
+.tl-item.flight .tl-name { color: var(--blue); font-weight: 300; }
+.tl-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  color: var(--ink-3);
+  letter-spacing: 0.5px;
+  align-items: center;
+}
+.map-btn {
+  background: none;
+  border: none;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 1px;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+.map-btn:hover { opacity: 0.5; }
+.tl-empty {
+  padding: 18px 0;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  letter-spacing: 3px;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--ink-4);
+}
+
+/* ─── SHOPPING ───────────────────────────── */
+.shop-add-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.shop-add-row select {
+  background: var(--white);
+  border: 1px solid var(--ink-4);
+  padding: 10px 12px;
+  font-family: var(--fnt);
+  font-size: 13px;
+  color: var(--ink);
+}
+.shop-owner-tag {
+  display: inline-block;
+  font-family: var(--fnt-mono);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  padding: 2px 6px;
+  border: 1px solid;
+  margin-top: 4px;
+}
+.owner-together { color: var(--accent); border-color: rgba(92,122,82,0.4); background: rgba(92,122,82,0.06); }
+.owner-shy      { color: var(--blue);   border-color: rgba(58,82,117,0.4); background: rgba(58,82,117,0.06); }
+.owner-christy  { color: #a04880;       border-color: rgba(160,72,128,0.4); background: rgba(160,72,128,0.06); }
+.shop-add-row input {
+  flex: 1;
+  background: var(--white);
+  border: 1px solid var(--ink-4);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.shop-add-row input::placeholder { color: var(--ink-3); }
+.shop-add-row input:focus { border-color: var(--ink-2); }
+.shop-prog {
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 24px;
+}
+.shop-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--ink-4);
+  transition: opacity 0.2s;
+}
+.shop-row:first-child { border-top: 1px solid var(--ink-4); }
+.shop-row.done { opacity: 0.3; }
+.chk {
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--ink-4);
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: transparent;
+  transition: all 0.15s;
+}
+.chk.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.shop-n { font-size: 13px; font-weight: 300; flex: 1; }
+.shop-row.done .shop-n { text-decoration: line-through; }
+.shop-w {
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  font-weight: 300;
+  color: var(--ink-3);
+  letter-spacing: 0.5px;
+  margin-top: 3px;
+}
+.shop-del {
+  background: none;
+  border: none;
+  color: var(--ink-4);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+  font-family: var(--fnt-mono);
+}
+.shop-del:hover { color: var(--red); }
+
+/* ─── RESPONSIVE ─────────────────────────── */
+@media (max-width: 680px) {
+  header { padding: 12px 24px 0; }
+  main { padding: 36px 24px; }
+
+  .h-eyebrow { font-size: 9px; margin-bottom: 4px; }
+  .h-title { font-size: 26px; letter-spacing: 1px; margin-bottom: 2px; }
+  .h-subtitle { font-size: 9px; margin-bottom: 8px; }
+
+  .nav-btn { font-size: 10px; letter-spacing: 2px; margin-right: 24px; padding: 10px 0; }
+
+  .row.c3, .row.c4 { grid-template-columns: 1fr; }
+  .lbl { font-size: 9px; margin-top: 36px; }
+  .fg label { font-size: 10px; }
+  .fg input, .fg select { font-size: 15px; padding: 12px 14px; }
+  .btn-add { font-size: 11px; padding: 13px 22px; width: 100%; text-align: center; }
+
+  .spot-row { grid-template-columns: 28px 1fr auto; gap: 12px; padding: 16px 0; }
+  .spot-idx { font-size: 10px; }
+  .spot-name { font-size: 15px; }
+  .spot-metas { font-size: 10px; gap: 8px; }
+  .tag { font-size: 9px; padding: 3px 7px; }
+  .ic { font-size: 10px; padding: 7px 12px; }
+
+  .filter-row { flex-wrap: wrap; }
+  .f-btn { font-size: 10px; padding: 6px 14px; }
+  .sort-lnk { font-size: 10px; }
+
+  .itin-hd { gap: 12px; padding-bottom: 12px; }
+  .day-pill { font-size: 9px; }
+  .day-datestr { font-size: 15px; }
+  .tl-item { padding: 14px 0; }
+  .tl-item.hotel, .tl-item.flight { padding-left: 12px; }
+  .tl-name { font-size: 14px; gap: 8px; }
+  .tl-meta { font-size: 10px; gap: 10px; }
+  .map-btn { font-size: 10px; }
+  .itin-day { margin-bottom: 44px; }
+
+  .shop-add-row { flex-direction: column; }
+  .shop-add-row input { font-size: 15px; padding: 12px 14px; }
+  .shop-prog { font-size: 10px; }
+  .shop-row { padding: 14px 0; gap: 14px; }
+  .shop-n { font-size: 14px; }
+  .shop-w { font-size: 10px; }
+  .chk { width: 18px; height: 18px; font-size: 10px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-eyebrow">Travel Planner</div>
+  <div class="h-title">台 灣</div>
+  <div class="h-subtitle">2026 . 07 . 01 &nbsp;—&nbsp; 07 . 05</div>
+  <nav class="nav">
+    <button class="nav-btn active" onclick="switchTab('spots',this)">景點 &amp; 食物</button>
+    <button class="nav-btn" onclick="switchTab('itinerary',this)">行程</button>
+    <button class="nav-btn" onclick="switchTab('shopping',this)">購物清單</button>
+  </nav>
+</header>
+
+<!-- ══ SPOTS ══════════════════════════════ -->
+<div id="tab-spots" class="tab-panel active">
+<main>
+  <div class="lbl" style="margin-top:36px">新增地點</div>
+  <div class="form-block">
+    <div class="row c3">
+      <div class="fg"><label>名稱</label><input type="text" id="inp-name" placeholder="e.g. 士林夜市"></div>
+      <div class="fg"><label>地址 / Maps 連結</label><input type="text" id="inp-addr" placeholder="地址或貼上 Google Maps 連結"></div>
+      <div class="fg"><label>類型</label>
+        <select id="inp-type"><option>景點</option><option>食物</option><option>咖啡店</option><option>酒吧</option><option>肥仔水</option><option>購物</option><option>其他</option></select>
+      </div>
+    </div>
+    <div class="row c4">
+      <div class="fg"><label>日期</label>
+        <select id="inp-day">
+          <option value="auto">🤖 由你決定（按距離）</option>
+          <option value="1">Day 1 — 1/7</option><option value="2">Day 2 — 2/7</option>
+          <option value="3">Day 3 — 3/7</option><option value="4">Day 4 — 4/7</option><option value="5">Day 5 — 5/7</option>
+        </select>
+      </div>
+      <div class="fg"><label>開放時間</label><input type="text" id="inp-hours" placeholder="e.g. 18:00 – 00:00"></div>
+      <div class="fg"><label>備註</label><input type="text" id="inp-note" placeholder="e.g. 晚餐"></div>
+      <div class="fg">
+        <label style="opacity:0">·</label>
+        <button class="btn-add" id="spot-submit" onclick="addSpot()">加入</button>
+        <button class="sort-lnk" id="spot-cancel" onclick="cancelEdit()" style="display:none;margin-top:6px">取消編輯</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="lbl">已儲存</div>
+  <div class="filter-row">
+    <button class="f-btn active" onclick="filterDay('all',this)">全部</button>
+    <button class="f-btn" onclick="filterDay('auto',this)">待編排</button>
+    <button class="f-btn" onclick="filterDay(1,this)">1/7</button>
+    <button class="f-btn" onclick="filterDay(2,this)">2/7</button>
+    <button class="f-btn" onclick="filterDay(3,this)">3/7</button>
+    <button class="f-btn" onclick="filterDay(4,this)">4/7</button>
+    <button class="f-btn" onclick="filterDay(5,this)">5/7</button>
+  </div>
+  <div class="sort-row">
+    <button class="sort-lnk" onclick="autoAssignDays()">🤖 自動編排（按距離）</button>
+    <button class="sort-lnk" onclick="optimizeDay()">↕ 智能排序</button>
+  </div>
+  <div id="spotsList"></div>
+</main>
+</div>
+
+<!-- ══ ITINERARY ══════════════════════════ -->
+<div id="tab-itinerary" class="tab-panel">
+<main><div id="itineraryView"></div></main>
+</div>
+
+<!-- ══ SHOPPING ════════════════════════════ -->
+<div id="tab-shopping" class="tab-panel">
+<main>
+  <div class="lbl">新增物品</div>
+  <div class="shop-add-row">
+    <input type="text" id="shop-name-inp" placeholder="物品名稱，e.g. 鳳梨酥">
+    <input type="text" id="shop-where-inp" placeholder="在哪裡買（可選）">
+    <select id="shop-owner-inp">
+      <option value="together">一齊買！</option>
+      <option value="shy">Shy 要買</option>
+      <option value="christy">Christy 要買</option>
+    </select>
+    <button class="btn-add" onclick="addShopItem()">加入</button>
+  </div>
+  <div class="lbl" style="margin-top:36px">清單</div>
+  <div class="filter-row" style="margin-bottom:12px">
+    <button class="f-btn active" onclick="filterShop('all',this)">全部</button>
+    <button class="f-btn" onclick="filterShop('together',this)">一齊買！</button>
+    <button class="f-btn" onclick="filterShop('shy',this)">Shy</button>
+    <button class="f-btn" onclick="filterShop('christy',this)">Christy</button>
+  </div>
+  <div class="shop-prog" id="shop-progress">0 / 0 已完成</div>
+  <div id="shopGrid"></div>
+</main>
+</div>
+
+<script>
+let spots = JSON.parse(localStorage.getItem('tw3-spots') || '[]');
+let shopItems = JSON.parse(localStorage.getItem('tw3-shop') || '[]');
+let currentFilter = 'all';
+let currentShopFilter = 'all';
+let editingSpotId = null;
+
+const ownerLabel = { together: '一齊買！', shy: 'Shy', christy: 'Christy' };
+
+const dayDates = {
+  1:'7月1日（週三）', 2:'7月2日（週四）',
+  3:'7月3日（週五）', 4:'7月4日（週六）', 5:'7月5日（週日）'
+};
+
+function save() {
+  localStorage.setItem('tw3-spots', JSON.stringify(spots));
+  localStorage.setItem('tw3-shop', JSON.stringify(shopItems));
+}
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'itinerary') renderItinerary();
+  if (tab === 'shopping') renderShop();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function addSpot() {
+  const name  = document.getElementById('inp-name').value.trim();
+  const addr  = document.getElementById('inp-addr').value.trim();
+  const type  = document.getElementById('inp-type').value;
+  const dayV  = document.getElementById('inp-day').value;
+  const day   = dayV === 'auto' ? 'auto' : parseInt(dayV);
+  const note  = document.getElementById('inp-note').value.trim();
+  const hours = document.getElementById('inp-hours').value.trim();
+  if (!name) return;
+  if (editingSpotId != null) {
+    const s = spots.find(x => x.id === editingSpotId);
+    if (s) {
+      if (s.day !== day) s.order = spots.filter(x => x.day === day).length;
+      Object.assign(s, { name, addr, type, day, note, hours });
+    }
+    cancelEdit();
+  } else {
+    spots.push({ id: Date.now(), name, addr, type, day, note, hours, order: spots.filter(s => s.day === day).length });
+  }
+  save();
+  ['inp-name','inp-addr','inp-note','inp-hours'].forEach(id => document.getElementById(id).value = '');
+  renderSpots();
+}
+
+function editSpot(id) {
+  const s = spots.find(x => x.id === id);
+  if (!s) return;
+  editingSpotId = id;
+  document.getElementById('inp-name').value  = s.name || '';
+  document.getElementById('inp-addr').value  = s.addr || '';
+  document.getElementById('inp-type').value  = s.type || '景點';
+  document.getElementById('inp-day').value   = s.day != null ? String(s.day) : 'auto';
+  document.getElementById('inp-hours').value = s.hours || '';
+  document.getElementById('inp-note').value  = s.note || '';
+  document.getElementById('spot-submit').textContent = '更新';
+  document.getElementById('spot-cancel').style.display = 'inline-block';
+  document.getElementById('inp-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('inp-name').focus();
+}
+
+function cancelEdit() {
+  editingSpotId = null;
+  document.getElementById('spot-submit').textContent = '加入';
+  document.getElementById('spot-cancel').style.display = 'none';
+  ['inp-name','inp-addr','inp-note','inp-hours'].forEach(id => document.getElementById(id).value = '');
+}
+
+function deleteSpot(id) {
+  if (!confirm('確定刪除？')) return;
+  spots = spots.filter(s => s.id !== id);
+  save(); renderSpots();
+}
+
+function openMap(spot) {
+  const url = (spot.addr && spot.addr.startsWith('http'))
+    ? spot.addr
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((spot.name + ' ' + (spot.addr || '')).trim())}`;
+  window.open(url, '_blank');
+}
+
+function filterDay(day, btn) {
+  currentFilter = day;
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderSpots();
+}
+
+function renderSpots() {
+  const list = document.getElementById('spotsList');
+  let filtered = currentFilter === 'all' ? [...spots] : spots.filter(s => s.day === currentFilter);
+  filtered.sort((a, b) => a.day - b.day || a.order - b.order);
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">— 尚未新增地點 —</div>';
+    return;
+  }
+  list.innerHTML = filtered.map((s, i) => `
+    <div class="spot-row">
+      <div class="spot-idx">${String(i + 1).padStart(2, '0')}</div>
+      <div>
+        <div class="spot-name">${s.name}</div>
+        <div class="spot-metas">
+          <span class="tag tag-${s.type}">${s.type}</span>
+          <span class="tag tag-其他">${s.day === 'auto' ? '待編排' : 'Day ' + s.day}</span>
+          ${s.addr  ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
+          ${s.hours ? `<span>${s.hours}</span>` : ''}
+          ${s.note  ? `<span>${s.note}</span>`  : ''}
+        </div>
+      </div>
+      <div class="spot-acts">
+        <button class="ic" onclick='openMap(${JSON.stringify(s)})'>Maps</button>
+        <button class="ic" onclick="editSpot(${s.id})">✎</button>
+        <button class="ic del" onclick="deleteSpot(${s.id})">×</button>
+      </div>
+    </div>`).join('');
+}
+
+function optimizeDay() {
+  const dayFilter = currentFilter === 'all' ? null : currentFilter;
+  let target = dayFilter ? spots.filter(s => s.day === dayFilter) : spots;
+  if (!target.length) return;
+  const ord = { '景點':0, '咖啡店':1, '食物':2, '肥仔水':3, '酒吧':4, '購物':5, '其他':6 };
+  target.sort((a, b) => (ord[a.type]||9) - (ord[b.type]||9));
+  target.forEach((s, i) => { const sp = spots.find(x => x.id === s.id); if (sp) sp.order = i; });
+  save(); renderSpots();
+}
+
+const TW_DISTRICTS = {
+  '信義':{lat:25.033,lng:121.565},'大安':{lat:25.027,lng:121.535},
+  '中山':{lat:25.064,lng:121.532},'松山':{lat:25.058,lng:121.578},
+  '士林':{lat:25.094,lng:121.526},'北投':{lat:25.132,lng:121.500},
+  '萬華':{lat:25.034,lng:121.499},'西門':{lat:25.042,lng:121.508},
+  '中正':{lat:25.032,lng:121.518},'大同':{lat:25.063,lng:121.515},
+  '南港':{lat:25.054,lng:121.606},'內湖':{lat:25.081,lng:121.589},
+  '文山':{lat:24.989,lng:121.572},'木柵':{lat:24.987,lng:121.575},
+  '永康街':{lat:25.033,lng:121.530},'東區':{lat:25.041,lng:121.549},
+  '九份':{lat:25.108,lng:121.844},'淡水':{lat:25.169,lng:121.444},
+  '陽明山':{lat:25.155,lng:121.560},
+  '士林夜市':{lat:25.088,lng:121.524},'饒河夜市':{lat:25.052,lng:121.578},
+  '寧夏夜市':{lat:25.057,lng:121.514},'華西街夜市':{lat:25.038,lng:121.500},
+  '101':{lat:25.034,lng:121.565},'象山':{lat:25.027,lng:121.572}
+};
+
+function getCoord(spot) {
+  const addr = spot.addr || '';
+  let m = addr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat:+m[1], lng:+m[2] };
+  m = addr.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/);
+  if (m) return { lat:+m[1], lng:+m[2] };
+  m = addr.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) return { lat:+m[1], lng:+m[2] };
+  const txt = addr + ' ' + (spot.name || '');
+  for (const [k, v] of Object.entries(TW_DISTRICTS)) {
+    if (txt.includes(k)) return v;
+  }
+  return null;
+}
+
+function kmeans(pts, k) {
+  if (pts.length <= k) return { centroids: pts.slice(), assignments: pts.map((_, i) => i) };
+  const sorted = [...pts].sort((a, b) => a.lng - b.lng);
+  let cents = Array.from({ length: k }, (_, i) => ({ ...sorted[Math.floor(i * pts.length / k)] }));
+  const assigns = new Array(pts.length);
+  for (let it = 0; it < 20; it++) {
+    pts.forEach((p, i) => {
+      let best = 0, bd = Infinity;
+      cents.forEach((c, j) => {
+        const d = (p.lat - c.lat) ** 2 + (p.lng - c.lng) ** 2;
+        if (d < bd) { bd = d; best = j; }
+      });
+      assigns[i] = best;
+    });
+    cents = cents.map((c, j) => {
+      const cluster = pts.filter((_, i) => assigns[i] === j);
+      if (!cluster.length) return c;
+      return {
+        lat: cluster.reduce((a, p) => a + p.lat, 0) / cluster.length,
+        lng: cluster.reduce((a, p) => a + p.lng, 0) / cluster.length
+      };
+    });
+  }
+  return { centroids: cents, assignments: assigns };
+}
+
+function autoAssignDays() {
+  const autoSpots = spots.filter(s => s.day === 'auto');
+  if (!autoSpots.length) { alert('冇地點要編排。先喺日期揀「🤖 由你決定」。'); return; }
+
+  autoSpots.forEach(s => { s._c = getCoord(s); });
+  const withC = autoSpots.filter(s => s._c);
+  const noC = autoSpots.filter(s => !s._c);
+
+  const centroids = {};
+  for (let d = 1; d <= 5; d++) {
+    const cs = spots.filter(s => s.day === d).map(getCoord).filter(c => c);
+    if (cs.length) {
+      centroids[d] = {
+        lat: cs.reduce((a, c) => a + c.lat, 0) / cs.length,
+        lng: cs.reduce((a, c) => a + c.lng, 0) / cs.length
+      };
+    }
+  }
+  const anchorCount = Object.keys(centroids).length;
+
+  if (anchorCount === 5) {
+    withC.forEach(s => { s.day = nearestDay(s._c, centroids); });
+  } else if (withC.length >= 5) {
+    const km = kmeans(withC.map(s => s._c), 5);
+    const order = km.centroids.map((c, i) => ({ c, i }))
+      .sort((a, b) => a.c.lng - b.c.lng || a.c.lat - b.c.lat);
+    const cMap = {};
+    order.forEach((x, i) => { cMap[x.i] = i + 1; });
+    withC.forEach((s, i) => { s.day = cMap[km.assignments[i]]; });
+  } else {
+    withC.sort((a, b) => a._c.lng - b._c.lng || a._c.lat - b._c.lat);
+    withC.forEach((s, i) => { s.day = i + 1; });
+  }
+
+  noC.forEach(s => {
+    const counts = [1,2,3,4,5].map(d => ({ d, n: spots.filter(x => x.day === d).length }));
+    counts.sort((a, b) => a.n - b.n);
+    s.day = counts[0].d;
+  });
+
+  autoSpots.forEach(s => delete s._c);
+  [1,2,3,4,5].forEach(d => {
+    spots.filter(x => x.day === d).forEach((s, i) => s.order = i);
+  });
+
+  save(); renderSpots();
+  const missing = noC.length ? `（${noC.length} 個冇坐標，按平均分配）` : '';
+  alert(`✓ 已編排 ${autoSpots.length} 個地點到 Day 1–5 ${missing}`);
+}
+
+function nearestDay(c, cents) {
+  let best = 1, bd = Infinity;
+  for (const [d, ct] of Object.entries(cents)) {
+    const dist = (c.lat - ct.lat) ** 2 + (c.lng - ct.lng) ** 2;
+    if (dist < bd) { bd = dist; best = +d; }
+  }
+  return best;
+}
+
+function dayRouteUrl(daySpots) {
+  const hotel = '台北松河璞旅';
+  if (!daySpots.length) return null;
+  const stopStr = s => {
+    const c = getCoord(s);
+    return c ? `${c.lat},${c.lng}` : s.name;
+  };
+  const wps = daySpots.slice(0, 9).map(stopStr).map(encodeURIComponent).join('%7C');
+  return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(hotel)}&destination=${encodeURIComponent(hotel)}&waypoints=${wps}&travelmode=driving`;
+}
+
+function dayEmbedUrl(daySpots) {
+  const hotel = '台北松河璞旅';
+  if (!daySpots.length) return null;
+  const stopStr = s => {
+    const c = getCoord(s);
+    return c ? `${c.lat},${c.lng}` : s.name;
+  };
+  const stops = daySpots.slice(0, 8).map(stopStr);
+  const daddr = [...stops, hotel].map(encodeURIComponent).join('+to:');
+  return `https://maps.google.com/maps?saddr=${encodeURIComponent(hotel)}&daddr=${daddr}&output=embed`;
+}
+
+function renderItinerary() {
+  const view = document.getElementById('itineraryView');
+
+  const hotelItem = (label, sub) => `
+    <div class="tl-item hotel">
+      <div class="tl-name"><span>${label}</span><span class="tag tag-酒店">酒店</span></div>
+      <div class="tl-meta">
+        <span>${sub}</span>
+        <button class="map-btn" onclick="window.open('https://www.google.com/maps/search/?api=1&query=台北松河璞旅','_blank')">Maps →</button>
+      </div>
+    </div>`;
+
+  const flightItem = (label, route, detail) => `
+    <div class="tl-item flight">
+      <div class="tl-name"><span>${label}</span><span class="tag tag-航班">航班</span></div>
+      <div class="tl-meta"><span>${route}</span><span>${detail}</span></div>
+    </div>`;
+
+  let html = '';
+  for (let d = 1; d <= 5; d++) {
+    const daySpots = spots.filter(s => s.day === d).sort((a,b) => a.order - b.order);
+    const routeUrl = dayRouteUrl(daySpots);
+    const embedUrl = dayEmbedUrl(daySpots);
+    html += `
+    <div class="itin-day">
+      <div class="itin-hd">
+        <span class="day-pill">Day ${d}</span>
+        <span class="day-datestr">${dayDates[d]}</span>
+        ${routeUrl ? `<button class="day-route" onclick="window.open('${routeUrl}','_blank')">🗺️ 開Maps</button>` : ''}
+      </div>
+      ${embedUrl ? `<div class="day-map-wrap"><iframe class="day-map-iframe" src="${embedUrl}" loading="lazy" allowfullscreen></iframe></div>` : ''}`;
+
+    if (d === 1) {
+      html += flightItem('CX494 出發', 'HKG → TPE · 10:10 – 12:10', 'Cathay Pacific');
+      html += hotelItem('Check-in · 台北松河璞旅', '璞致客房－雙床 · 4 晚');
+    }
+
+    html += hotelItem('台北松河璞旅', '出發');
+
+    if (!daySpots.length) {
+      html += `<div class="tl-empty">— 未有安排 —</div>`;
+    } else {
+      html += daySpots.map(s => `
+        <div class="tl-item">
+          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span></div>
+          <div class="tl-meta">
+            ${s.addr  ? `<span>${s.addr}</span>` : ''}
+            ${s.hours ? `<span>${s.hours}</span>` : ''}
+            ${s.note  ? `<span>${s.note}</span>`  : ''}
+            <button class="map-btn" onclick='openMap(${JSON.stringify(s)})'>Maps →</button>
+          </div>
+        </div>`).join('');
+    }
+
+    html += hotelItem('台北松河璞旅', '返回');
+
+    if (d === 5) {
+      html += hotelItem('Check-out · 台北松河璞旅', '退房');
+      html += flightItem('CX479 回程', 'TPE → HKG · 21:05 – 23:05', 'Cathay Pacific');
+    }
+
+    html += `</div>`;
+  }
+  view.innerHTML = html;
+}
+
+function addShopItem() {
+  const name  = document.getElementById('shop-name-inp').value.trim();
+  const where = document.getElementById('shop-where-inp').value.trim();
+  const owner = document.getElementById('shop-owner-inp').value;
+  if (!name) return;
+  shopItems.push({ id: Date.now(), name, where, owner, done: false });
+  save();
+  document.getElementById('shop-name-inp').value = '';
+  document.getElementById('shop-where-inp').value = '';
+  renderShop();
+}
+function toggleShop(id) {
+  const item = shopItems.find(s => s.id === id);
+  if (item) { item.done = !item.done; save(); renderShop(); }
+}
+function deleteShop(id) {
+  shopItems = shopItems.filter(s => s.id !== id);
+  save(); renderShop();
+}
+function filterShop(f, btn) {
+  currentShopFilter = f;
+  document.querySelectorAll('#tab-shopping .f-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderShop();
+}
+function renderShop() {
+  const visible = currentShopFilter === 'all' ? shopItems : shopItems.filter(s => (s.owner || 'together') === currentShopFilter);
+  const done = visible.filter(s => s.done).length;
+  document.getElementById('shop-progress').textContent = `${done} / ${visible.length} 已完成`;
+  document.getElementById('shopGrid').innerHTML = visible.map(s => {
+    const owner = s.owner || 'together';
+    return `
+    <div class="shop-row${s.done ? ' done' : ''}">
+      <div class="chk${s.done ? ' on' : ''}" onclick="toggleShop(${s.id})">${s.done ? '✓' : ''}</div>
+      <div style="flex:1;min-width:0">
+        <div class="shop-n">${s.name}</div>
+        ${s.where ? `<div class="shop-w">${s.where}</div>` : ''}
+        <span class="shop-owner-tag owner-${owner}">${ownerLabel[owner]}</span>
+      </div>
+      <button class="shop-del" onclick="deleteShop(${s.id})">×</button>
+    </div>`;
+  }).join('');
+}
+
+renderSpots();
+</script>
+</body>
+</html>
