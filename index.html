@@ -402,6 +402,18 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
 .owner-together { color: var(--accent); border-color: rgba(92,122,82,0.4); background: rgba(92,122,82,0.06); }
 .owner-shy      { color: var(--blue);   border-color: rgba(58,82,117,0.4); background: rgba(58,82,117,0.06); }
 .owner-christy  { color: #a04880;       border-color: rgba(160,72,128,0.4); background: rgba(160,72,128,0.06); }
+.src-lnk {
+  display: inline-block;
+  font-family: var(--fnt-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border: 1px solid var(--ink-4);
+  color: var(--accent);
+  text-decoration: none;
+  transition: all 0.15s;
+}
+.src-lnk:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
 .shop-add-row input {
   flex: 1;
   background: var(--white);
@@ -523,7 +535,7 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
 <header>
   <div class="h-eyebrow">Travel Planner</div>
   <div class="h-title">台 灣</div>
-  <div class="h-subtitle">2026 . 07 . 01 &nbsp;—&nbsp; 07 . 05</div>
+  <div class="h-subtitle">2026 . 07 . 01 &nbsp;—&nbsp; 07 . 05 &nbsp;·&nbsp; <span id="sync-status" onclick="pullFromCloud()" style="cursor:pointer">☁ 連接中…</span></div>
   <nav class="nav">
     <button class="nav-btn active" onclick="switchTab('spots',this)">景點 &amp; 食物</button>
     <button class="nav-btn" onclick="switchTab('itinerary',this)">行程</button>
@@ -557,6 +569,11 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
         <label style="opacity:0">·</label>
         <button class="btn-add" id="spot-submit" onclick="addSpot()">加入</button>
         <button class="sort-lnk" id="spot-cancel" onclick="cancelEdit()" style="display:none;margin-top:6px">取消編輯</button>
+      </div>
+    </div>
+    <div class="row" style="grid-template-columns:1fr">
+      <div class="fg"><label>邊度睇到（可選）— 貼 IG / 小紅書連結</label>
+        <input type="text" id="inp-source" placeholder="https://www.instagram.com/p/... 或 小紅書連結">
       </div>
     </div>
   </div>
@@ -597,6 +614,7 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
       <option value="christy">Christy 要買</option>
     </select>
     <button class="btn-add" onclick="addShopItem()">加入</button>
+    <input type="text" id="shop-source-inp" placeholder="邊度睇到（可選）— IG / 小紅書連結" style="flex-basis:100%">
   </div>
   <div class="lbl" style="margin-top:36px">清單</div>
   <div class="filter-row" style="margin-bottom:12px">
@@ -611,13 +629,76 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
 </div>
 
 <script>
+const JSONBIN_KEY = '$2a$10$qd0.Umd1x416BjPnuVx/dufic6cQ1C0ldmGQC2EDeLCjIICN74mmi';
+const JSONBIN_BIN = '6a0c403dee5a733b12e38dfa';
+const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/' + JSONBIN_BIN;
+
 let spots = JSON.parse(localStorage.getItem('tw3-spots') || '[]');
 let shopItems = JSON.parse(localStorage.getItem('tw3-shop') || '[]');
 let currentFilter = 'all';
 let currentShopFilter = 'all';
 let editingSpotId = null;
+let syncTimer = null;
+let isPulling = false;
 
 const ownerLabel = { together: '一齊買！', shy: 'Shy', christy: 'Christy' };
+
+function setSyncStatus(text, color) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = color || '';
+}
+
+async function pullFromCloud() {
+  isPulling = true;
+  setSyncStatus('☁ 同步中…', 'rgba(255,255,255,0.55)');
+  try {
+    const res = await fetch(JSONBIN_URL + '/latest', {
+      headers: { 'X-Access-Key': JSONBIN_KEY }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const rec = data.record || data;
+    if (Array.isArray(rec.spots)) spots = rec.spots;
+    if (Array.isArray(rec.shop))  shopItems = rec.shop;
+    localStorage.setItem('tw3-spots', JSON.stringify(spots));
+    localStorage.setItem('tw3-shop', JSON.stringify(shopItems));
+    renderSpots();
+    if (document.getElementById('tab-shopping').classList.contains('active')) renderShop();
+    if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
+    setSyncStatus('✓ 已同步', 'rgba(150,220,150,0.85)');
+  } catch (e) {
+    setSyncStatus('⚠ 離線', 'rgba(255,150,150,0.85)');
+    console.error('pull failed', e);
+  }
+  isPulling = false;
+}
+
+async function pushToCloud() {
+  if (isPulling) return;
+  setSyncStatus('☁ 上傳中…', 'rgba(255,255,255,0.55)');
+  try {
+    const res = await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Access-Key': JSONBIN_KEY
+      },
+      body: JSON.stringify({ spots, shop: shopItems })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    setSyncStatus('✓ 已同步', 'rgba(150,220,150,0.85)');
+  } catch (e) {
+    setSyncStatus('⚠ 離線', 'rgba(255,150,150,0.85)');
+    console.error('push failed', e);
+  }
+}
+
+function scheduleSync() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushToCloud, 800);
+}
 
 const dayDates = {
   1:'7月1日（週三）', 2:'7月2日（週四）',
@@ -627,6 +708,7 @@ const dayDates = {
 function save() {
   localStorage.setItem('tw3-spots', JSON.stringify(spots));
   localStorage.setItem('tw3-shop', JSON.stringify(shopItems));
+  scheduleSync();
 }
 
 function switchTab(tab, btn) {
@@ -640,26 +722,27 @@ function switchTab(tab, btn) {
 }
 
 function addSpot() {
-  const name  = document.getElementById('inp-name').value.trim();
-  const addr  = document.getElementById('inp-addr').value.trim();
-  const type  = document.getElementById('inp-type').value;
-  const dayV  = document.getElementById('inp-day').value;
-  const day   = dayV === 'auto' ? 'auto' : parseInt(dayV);
-  const note  = document.getElementById('inp-note').value.trim();
-  const hours = document.getElementById('inp-hours').value.trim();
+  const name   = document.getElementById('inp-name').value.trim();
+  const addr   = document.getElementById('inp-addr').value.trim();
+  const type   = document.getElementById('inp-type').value;
+  const dayV   = document.getElementById('inp-day').value;
+  const day    = dayV === 'auto' ? 'auto' : parseInt(dayV);
+  const note   = document.getElementById('inp-note').value.trim();
+  const hours  = document.getElementById('inp-hours').value.trim();
+  const source = document.getElementById('inp-source').value.trim();
   if (!name) return;
   if (editingSpotId != null) {
     const s = spots.find(x => x.id === editingSpotId);
     if (s) {
       if (s.day !== day) s.order = spots.filter(x => x.day === day).length;
-      Object.assign(s, { name, addr, type, day, note, hours });
+      Object.assign(s, { name, addr, type, day, note, hours, source });
     }
     cancelEdit();
   } else {
-    spots.push({ id: Date.now(), name, addr, type, day, note, hours, order: spots.filter(s => s.day === day).length });
+    spots.push({ id: Date.now(), name, addr, type, day, note, hours, source, order: spots.filter(s => s.day === day).length });
   }
   save();
-  ['inp-name','inp-addr','inp-note','inp-hours'].forEach(id => document.getElementById(id).value = '');
+  ['inp-name','inp-addr','inp-note','inp-hours','inp-source'].forEach(id => document.getElementById(id).value = '');
   renderSpots();
 }
 
@@ -667,12 +750,13 @@ function editSpot(id) {
   const s = spots.find(x => x.id === id);
   if (!s) return;
   editingSpotId = id;
-  document.getElementById('inp-name').value  = s.name || '';
-  document.getElementById('inp-addr').value  = s.addr || '';
-  document.getElementById('inp-type').value  = s.type || '景點';
-  document.getElementById('inp-day').value   = s.day != null ? String(s.day) : 'auto';
-  document.getElementById('inp-hours').value = s.hours || '';
-  document.getElementById('inp-note').value  = s.note || '';
+  document.getElementById('inp-name').value   = s.name || '';
+  document.getElementById('inp-addr').value   = s.addr || '';
+  document.getElementById('inp-type').value   = s.type || '景點';
+  document.getElementById('inp-day').value    = s.day != null ? String(s.day) : 'auto';
+  document.getElementById('inp-hours').value  = s.hours || '';
+  document.getElementById('inp-note').value   = s.note || '';
+  document.getElementById('inp-source').value = s.source || '';
   document.getElementById('spot-submit').textContent = '更新';
   document.getElementById('spot-cancel').style.display = 'inline-block';
   document.getElementById('inp-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -683,13 +767,23 @@ function cancelEdit() {
   editingSpotId = null;
   document.getElementById('spot-submit').textContent = '加入';
   document.getElementById('spot-cancel').style.display = 'none';
-  ['inp-name','inp-addr','inp-note','inp-hours'].forEach(id => document.getElementById(id).value = '');
+  ['inp-name','inp-addr','inp-note','inp-hours','inp-source'].forEach(id => document.getElementById(id).value = '');
 }
 
 function deleteSpot(id) {
   if (!confirm('確定刪除？')) return;
   spots = spots.filter(s => s.id !== id);
   save(); renderSpots();
+}
+
+function sourceLabel(url) {
+  const u = (url || '').toLowerCase();
+  if (u.includes('instagram.com')) return '📷 IG';
+  if (u.includes('xiaohongshu.com') || u.includes('xhslink')) return '📕 小紅書';
+  if (u.includes('tiktok.com')) return '🎵 TikTok';
+  if (u.includes('youtube.com') || u.includes('youtu.be')) return '▶️ YouTube';
+  if (u.includes('facebook.com')) return '📘 FB';
+  return '🔗 來源';
 }
 
 function openMap(spot) {
@@ -725,6 +819,7 @@ function renderSpots() {
           ${s.addr  ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
           ${s.hours ? `<span>${s.hours}</span>` : ''}
           ${s.note  ? `<span>${s.note}</span>`  : ''}
+          ${s.source ? `<a class="src-lnk" href="${s.source}" target="_blank" rel="noopener">${sourceLabel(s.source)}</a>` : ''}
         </div>
       </div>
       <div class="spot-acts">
@@ -933,6 +1028,7 @@ function renderItinerary() {
             ${s.addr  ? `<span>${s.addr}</span>` : ''}
             ${s.hours ? `<span>${s.hours}</span>` : ''}
             ${s.note  ? `<span>${s.note}</span>`  : ''}
+            ${s.source ? `<a class="src-lnk" href="${s.source}" target="_blank" rel="noopener">${sourceLabel(s.source)}</a>` : ''}
             <button class="map-btn" onclick='openMap(${JSON.stringify(s)})'>Maps →</button>
           </div>
         </div>`).join('');
@@ -951,14 +1047,16 @@ function renderItinerary() {
 }
 
 function addShopItem() {
-  const name  = document.getElementById('shop-name-inp').value.trim();
-  const where = document.getElementById('shop-where-inp').value.trim();
-  const owner = document.getElementById('shop-owner-inp').value;
+  const name   = document.getElementById('shop-name-inp').value.trim();
+  const where  = document.getElementById('shop-where-inp').value.trim();
+  const owner  = document.getElementById('shop-owner-inp').value;
+  const source = document.getElementById('shop-source-inp').value.trim();
   if (!name) return;
-  shopItems.push({ id: Date.now(), name, where, owner, done: false });
+  shopItems.push({ id: Date.now(), name, where, owner, source, done: false });
   save();
   document.getElementById('shop-name-inp').value = '';
   document.getElementById('shop-where-inp').value = '';
+  document.getElementById('shop-source-inp').value = '';
   renderShop();
 }
 function toggleShop(id) {
@@ -987,7 +1085,10 @@ function renderShop() {
       <div style="flex:1;min-width:0">
         <div class="shop-n">${s.name}</div>
         ${s.where ? `<div class="shop-w">${s.where}</div>` : ''}
-        <span class="shop-owner-tag owner-${owner}">${ownerLabel[owner]}</span>
+        <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="shop-owner-tag owner-${owner}">${ownerLabel[owner]}</span>
+          ${s.source ? `<a class="src-lnk" href="${s.source}" target="_blank" rel="noopener">${sourceLabel(s.source)}</a>` : ''}
+        </div>
       </div>
       <button class="shop-del" onclick="deleteShop(${s.id})">×</button>
     </div>`;
@@ -995,6 +1096,8 @@ function renderShop() {
 }
 
 renderSpots();
+pullFromCloud();
+window.addEventListener('focus', () => { if (!syncTimer) pullFromCloud(); });
 </script>
 </body>
 </html>
