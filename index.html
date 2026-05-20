@@ -371,6 +371,7 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
   transition: opacity 0.15s;
 }
 .map-btn:hover { opacity: 0.5; }
+.map-btn:disabled { color: var(--ink-4); cursor: not-allowed; opacity: 0.4; }
 .tl-empty {
   padding: 18px 0;
   font-family: var(--fnt-mono);
@@ -746,6 +747,26 @@ function addSpot() {
   renderSpots();
 }
 
+function moveSpot(id, dir) {
+  const s = spots.find(x => x.id === id);
+  if (!s) return;
+  const sib = spots.filter(x => x.day === s.day).sort((a, b) => (a.order || 0) - (b.order || 0));
+  const idx = sib.findIndex(x => x.id === id);
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= sib.length) return;
+  [sib[idx], sib[newIdx]] = [sib[newIdx], sib[idx]];
+  sib.forEach((x, i) => { x.order = i; });
+  save();
+  renderItinerary();
+  renderSpots();
+}
+
+function editSpotFromItinerary(id) {
+  const spotsBtn = document.querySelector('.nav-btn');
+  switchTab('spots', spotsBtn);
+  setTimeout(() => editSpot(id), 50);
+}
+
 function editSpot(id) {
   const s = spots.find(x => x.id === id);
   if (!s) return;
@@ -774,6 +795,7 @@ function deleteSpot(id) {
   if (!confirm('確定刪除？')) return;
   spots = spots.filter(s => s.id !== id);
   save(); renderSpots();
+  if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
 }
 
 function sourceLabel(url) {
@@ -1021,7 +1043,7 @@ function renderItinerary() {
     if (!daySpots.length) {
       html += `<div class="tl-empty">— 未有安排 —</div>`;
     } else {
-      html += daySpots.map(s => `
+      html += daySpots.map((s, i) => `
         <div class="tl-item">
           <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span></div>
           <div class="tl-meta">
@@ -1030,6 +1052,10 @@ function renderItinerary() {
             ${s.note  ? `<span>${s.note}</span>`  : ''}
             ${s.source ? `<a class="src-lnk" href="${s.source}" target="_blank" rel="noopener">${sourceLabel(s.source)}</a>` : ''}
             <button class="map-btn" onclick='openMap(${JSON.stringify(s)})'>Maps →</button>
+            <button class="map-btn" onclick="moveSpot(${s.id},-1)" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button class="map-btn" onclick="moveSpot(${s.id},1)" ${i === daySpots.length - 1 ? 'disabled' : ''}>↓</button>
+            <button class="map-btn" onclick="editSpotFromItinerary(${s.id})">✎ 編輯</button>
+            <button class="map-btn" onclick="deleteSpot(${s.id})">× 刪除</button>
           </div>
         </div>`).join('');
     }
