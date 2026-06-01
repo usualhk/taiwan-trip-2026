@@ -687,11 +687,6 @@ const dayDates = {
   3:'7月3日（週五）', 4:'7月4日（週六）', 5:'7月5日（週日）'
 };
 
-function save() {
-  localStorage.setItem('tw3-spots', JSON.stringify(spots));
-  localStorage.setItem('tw3-shop', JSON.stringify(shopItems));
-}
-
 function switchTab(tab, btn) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
