@@ -256,6 +256,17 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
 .tag-航班  { color: var(--blue);   border-color: rgba(58,82,117,0.4);   background: rgba(58,82,117,0.06);  }
 .tag-酒吧   { color: #7a2855;      border-color: rgba(122,40,85,0.35);  background: rgba(122,40,85,0.05);  }
 .tag-肥仔水 { color: #c47a1a;      border-color: rgba(196,122,26,0.4);  background: rgba(196,122,26,0.07); }
+
+/* ─── 類型底色分類（景點列表 + 行程） ─── */
+.spot-row.rt-景點,  .tl-item.rt-景點  { background: rgba(58,82,117,0.18);  box-shadow: inset 6px 0 0 #3a5275; }
+.spot-row.rt-食物,  .tl-item.rt-食物  { background: rgba(160,48,32,0.18);  box-shadow: inset 6px 0 0 #a03020; }
+.spot-row.rt-咖啡店, .tl-item.rt-咖啡店 { background: rgba(92,122,82,0.20);  box-shadow: inset 6px 0 0 #5c7a52; }
+.spot-row.rt-酒吧,  .tl-item.rt-酒吧  { background: rgba(122,40,85,0.18);  box-shadow: inset 6px 0 0 #7a2855; }
+.spot-row.rt-肥仔水, .tl-item.rt-肥仔水 { background: rgba(196,122,26,0.22); box-shadow: inset 6px 0 0 #c47a1a; }
+.spot-row.rt-購物,  .tl-item.rt-購物  { background: rgba(107,74,138,0.18); box-shadow: inset 6px 0 0 #6b4a8a; }
+.spot-row.rt-其他,  .tl-item.rt-其他  { background: rgba(106,103,96,0.14); box-shadow: inset 6px 0 0 #6a6760; }
+.spot-row[class*="rt-"] { padding-left: 14px; padding-right: 10px; }
+.tl-item[class*="rt-"]  { padding-left: 16px; padding-right: 10px; }
 .spot-acts { display: flex; gap: 4px; padding-top: 2px; }
 .ic {
   background: none;
@@ -543,6 +554,14 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
         <select id="inp-type"><option>景點</option><option>食物</option><option>咖啡店</option><option>酒吧</option><option>肥仔水</option><option>購物</option><option>其他</option></select>
       </div>
     </div>
+    <div class="row" style="grid-template-columns: 1fr auto;">
+      <div class="fg"><label>來源 link（IG / blog / 文章）</label><input type="text" id="inp-link" placeholder="貼上連結，行程度可以直接撳開"></div>
+      <div class="fg"><label>訂位</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:9px 0;white-space:nowrap;cursor:pointer;">
+          <input type="checkbox" id="inp-booked" style="width:16px;height:16px;cursor:pointer;"> 已訂位（餐廳）
+        </label>
+      </div>
+    </div>
     <div class="row c4">
       <div class="fg"><label>日期</label>
         <select id="inp-day">
@@ -591,12 +610,14 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
   <div class="shop-add-row">
     <input type="text" id="shop-name-inp" placeholder="物品名稱，e.g. 鳳梨酥">
     <input type="text" id="shop-where-inp" placeholder="在哪裡買（可選）">
+    <input type="text" id="shop-link-inp" placeholder="來源 link（可選）">
     <select id="shop-owner-inp">
       <option value="together">一齊買！</option>
       <option value="shy">Shy 要買</option>
       <option value="christy">Christy 要買</option>
     </select>
-    <button class="btn-add" onclick="addShopItem()">加入</button>
+    <button class="btn-add" id="shop-submit" onclick="addShopItem()">加入</button>
+    <button class="sort-lnk" id="shop-cancel" onclick="cancelShopEdit()" style="display:none">取消編輯</button>
   </div>
   <div class="lbl" style="margin-top:36px">清單</div>
   <div class="filter-row" style="margin-bottom:12px">
@@ -625,6 +646,7 @@ let shopItems = [];
 let currentFilter = 'all';
 let currentShopFilter = 'all';
 let editingSpotId = null;
+let editingShopId = null;
 
 const ownerLabel = { together: '一齊買！', shy: 'Shy', christy: 'Christy' };
 
@@ -632,10 +654,10 @@ const ownerLabel = { together: '一齊買！', shy: 'Shy', christy: 'Christy' };
 let sb = null;
 const dbReady = () => sb !== null;
 
-const spotToRow = s => ({ id: s.id, name: s.name, addr: s.addr, type: s.type, day: String(s.day), note: s.note, hours: s.hours, ord: s.order });
-const rowToSpot = r => ({ id: r.id, name: r.name, addr: r.addr, type: r.type, day: r.day === 'auto' ? 'auto' : Number(r.day), note: r.note, hours: r.hours, order: r.ord });
-const shopToRow = s => ({ id: s.id, name: s.name, place: s.where, owner: s.owner, done: s.done });
-const rowToShop = r => ({ id: r.id, name: r.name, where: r.place, owner: r.owner, done: r.done });
+const spotToRow = s => ({ id: s.id, name: s.name, addr: s.addr, type: s.type, day: String(s.day), note: s.note, hours: s.hours, link: s.link || '', booked: !!s.booked, ord: s.order });
+const rowToSpot = r => ({ id: r.id, name: r.name, addr: r.addr, type: r.type, day: r.day === 'auto' ? 'auto' : Number(r.day), note: r.note, hours: r.hours, link: r.link || '', booked: !!r.booked, order: r.ord });
+const shopToRow = s => ({ id: s.id, name: s.name, place: s.where, owner: s.owner, link: s.link || '', done: s.done });
+const rowToShop = r => ({ id: r.id, name: r.name, where: r.place, owner: r.owner, link: r.link || '', done: r.done });
 
 async function save() {
   if (!dbReady()) return;
@@ -705,20 +727,29 @@ function addSpot() {
   const day   = dayV === 'auto' ? 'auto' : parseInt(dayV);
   const note  = document.getElementById('inp-note').value.trim();
   const hours = document.getElementById('inp-hours').value.trim();
+  const link  = document.getElementById('inp-link').value.trim();
+  const booked = document.getElementById('inp-booked').checked;
   if (!name) return;
-  if (editingSpotId != null) {
+  const isEdit = editingSpotId != null;
+  if (isEdit) {
     const s = spots.find(x => x.id === editingSpotId);
     if (s) {
       if (s.day !== day) s.order = spots.filter(x => x.day === day).length;
-      Object.assign(s, { name, addr, type, day, note, hours });
+      Object.assign(s, { name, addr, type, day, note, hours, link, booked });
     }
     cancelEdit();
   } else {
-    spots.push({ id: Date.now(), name, addr, type, day, note, hours, order: spots.filter(s => s.day === day).length });
+    spots.push({ id: Date.now(), name, addr, type, day, note, hours, link, booked, order: spots.filter(s => s.day === day).length });
   }
-  save();
-  ['inp-name','inp-addr','inp-note','inp-hours'].forEach(id => document.getElementById(id).value = '');
-  renderSpots();
+  ['inp-name','inp-addr','inp-note','inp-hours','inp-link'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inp-booked').checked = false;
+  // 新增時揀「由你決定」就即刻按距離自動編排到某一日，唔留喺待編排
+  if (!isEdit && day === 'auto') {
+    autoAssignDays(true);   // 內部會 save() + renderSpots()
+  } else {
+    save();
+    renderSpots();
+  }
 }
 
 function editSpot(id) {
@@ -731,6 +762,8 @@ function editSpot(id) {
   document.getElementById('inp-day').value   = s.day != null ? String(s.day) : 'auto';
   document.getElementById('inp-hours').value = s.hours || '';
   document.getElementById('inp-note').value  = s.note || '';
+  document.getElementById('inp-link').value  = s.link || '';
+  document.getElementById('inp-booked').checked = !!s.booked;
   document.getElementById('spot-submit').textContent = '更新';
   document.getElementById('spot-cancel').style.display = 'inline-block';
   document.getElementById('inp-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -741,7 +774,8 @@ function cancelEdit() {
   editingSpotId = null;
   document.getElementById('spot-submit').textContent = '加入';
   document.getElementById('spot-cancel').style.display = 'none';
-  ['inp-name','inp-addr','inp-note','inp-hours'].forEach(id => document.getElementById(id).value = '');
+  ['inp-name','inp-addr','inp-note','inp-hours','inp-link'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('inp-booked').checked = false;
 }
 
 async function deleteSpot(id) {
@@ -757,6 +791,33 @@ function editFromItinerary(id) {
   const spotsTabBtn = document.querySelector('.nav-btn');
   switchTab('spots', spotsTabBtn);
   editSpot(id);
+}
+
+// 喺「行程」分頁手動上/下移動同一日內嘅景點順序（dir = -1 上, 1 下）
+function moveSpot(id, dir) {
+  const s = spots.find(x => x.id === id);
+  if (!s) return;
+  const sameDay = spots.filter(x => x.day === s.day).sort((a, b) => a.order - b.order);
+  const idx = sameDay.findIndex(x => x.id === id);
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= sameDay.length) return;
+  // 重新編號確保連續，再對調
+  sameDay.forEach((x, i) => { x.order = i; });
+  const other = sameDay[swapIdx];
+  const tmp = s.order; s.order = other.order; other.order = tmp;
+  save();
+  renderItinerary();
+  renderSpots();
+}
+
+// 餐廳訂位狀態切換
+function toggleBooked(id) {
+  const s = spots.find(x => x.id === id);
+  if (!s) return;
+  s.booked = !s.booked;
+  save();
+  renderSpots();
+  if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
 }
 
 function openMap(spot) {
@@ -782,13 +843,15 @@ function renderSpots() {
     return;
   }
   list.innerHTML = filtered.map((s, i) => `
-    <div class="spot-row">
+    <div class="spot-row rt-${s.type}">
       <div class="spot-idx">${String(i + 1).padStart(2, '0')}</div>
       <div>
         <div class="spot-name">${s.name}</div>
         <div class="spot-metas">
           <span class="tag tag-${s.type}">${s.type}</span>
           <span class="tag tag-其他">${s.day === 'auto' ? '待編排' : 'Day ' + s.day}</span>
+          ${(s.type === '食物' || s.booked) ? `<span class="tag" style="cursor:pointer;${s.booked ? 'color:#2e7d32;border-color:#2e7d32;background:rgba(46,125,50,0.12)' : 'color:#a03020;border-color:#a03020;background:rgba(160,48,32,0.08)'}" onclick="toggleBooked(${s.id})">${s.booked ? '✅ 已訂位' : '⚠ 未訂位'}</span>` : ''}
+          ${s.link ? `<span style="cursor:pointer;color:var(--accent)" onclick='window.open(${JSON.stringify(s.link)},"_blank")'>🔗 來源</span>` : ''}
           ${s.addr  ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
           ${s.hours ? `<span>${s.hours}</span>` : ''}
           ${s.note  ? `<span>${s.note}</span>`  : ''}
@@ -869,9 +932,9 @@ function kmeans(pts, k) {
   return { centroids: cents, assignments: assigns };
 }
 
-function autoAssignDays() {
+function autoAssignDays(silent) {
   const autoSpots = spots.filter(s => s.day === 'auto');
-  if (!autoSpots.length) { alert('冇地點要編排。先喺日期揀「🤖 由你決定」。'); return; }
+  if (!autoSpots.length) { if (!silent) alert('冇地點要編排。先喺日期揀「🤖 由你決定」。'); return; }
 
   autoSpots.forEach(s => { s._c = getCoord(s); });
   const withC = autoSpots.filter(s => s._c);
@@ -915,8 +978,10 @@ function autoAssignDays() {
   });
 
   save(); renderSpots();
-  const missing = noC.length ? `（${noC.length} 個冇坐標，按平均分配）` : '';
-  alert(`✓ 已編排 ${autoSpots.length} 個地點到 Day 1–5 ${missing}`);
+  if (!silent) {
+    const missing = noC.length ? `（${noC.length} 個冇坐標，按平均分配）` : '';
+    alert(`✓ 已編排 ${autoSpots.length} 個地點到 Day 1–5 ${missing}`);
+  }
 }
 
 function nearestDay(c, cents) {
@@ -994,13 +1059,16 @@ function renderItinerary() {
       html += `<div class="tl-empty">— 未有安排 —</div>`;
     } else {
       html += daySpots.map(s => `
-        <div class="tl-item">
-          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span></div>
+        <div class="tl-item rt-${s.type}">
+          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${(s.type === '食物' || s.booked) ? `<span class="tag" style="cursor:pointer;${s.booked ? 'color:#2e7d32;border-color:#2e7d32;background:rgba(46,125,50,0.12)' : 'color:#a03020;border-color:#a03020;background:rgba(160,48,32,0.08)'}" onclick="toggleBooked(${s.id})">${s.booked ? '✅ 已訂位' : '⚠ 未訂位'}</span>` : ''}</div>
           <div class="tl-meta">
             ${s.addr  ? `<span>${s.addr}</span>` : ''}
             ${s.hours ? `<span>${s.hours}</span>` : ''}
             ${s.note  ? `<span>${s.note}</span>`  : ''}
+            <button class="map-btn" onclick="moveSpot(${s.id},-1)">↑ 上移</button>
+            <button class="map-btn" onclick="moveSpot(${s.id},1)">↓ 下移</button>
             <button class="map-btn" onclick='openMap(${JSON.stringify(s)})'>Maps →</button>
+            ${s.link ? `<button class="map-btn" onclick='window.open(${JSON.stringify(s.link)},"_blank")'>🔗 來源 →</button>` : ''}
             <button class="map-btn" onclick="editFromItinerary(${s.id})">✎ 編輯</button>
             <button class="map-btn" onclick="deleteSpot(${s.id})">× 刪除</button>
           </div>
@@ -1022,13 +1090,38 @@ function renderItinerary() {
 function addShopItem() {
   const name  = document.getElementById('shop-name-inp').value.trim();
   const where = document.getElementById('shop-where-inp').value.trim();
+  const link  = document.getElementById('shop-link-inp').value.trim();
   const owner = document.getElementById('shop-owner-inp').value;
   if (!name) return;
-  shopItems.push({ id: Date.now(), name, where, owner, done: false });
+  if (editingShopId != null) {
+    const item = shopItems.find(s => s.id === editingShopId);
+    if (item) Object.assign(item, { name, where, link, owner });
+    cancelShopEdit();
+  } else {
+    shopItems.push({ id: Date.now(), name, where, link, owner, done: false });
+  }
+  ['shop-name-inp','shop-where-inp','shop-link-inp'].forEach(id => document.getElementById(id).value = '');
   save();
-  document.getElementById('shop-name-inp').value = '';
-  document.getElementById('shop-where-inp').value = '';
   renderShop();
+}
+function editShopItem(id) {
+  const s = shopItems.find(x => x.id === id);
+  if (!s) return;
+  editingShopId = id;
+  document.getElementById('shop-name-inp').value  = s.name || '';
+  document.getElementById('shop-where-inp').value = s.where || '';
+  document.getElementById('shop-link-inp').value  = s.link || '';
+  document.getElementById('shop-owner-inp').value = s.owner || 'together';
+  document.getElementById('shop-submit').textContent = '更新';
+  document.getElementById('shop-cancel').style.display = 'inline-block';
+  document.getElementById('shop-name-inp').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('shop-name-inp').focus();
+}
+function cancelShopEdit() {
+  editingShopId = null;
+  document.getElementById('shop-submit').textContent = '加入';
+  document.getElementById('shop-cancel').style.display = 'none';
+  ['shop-name-inp','shop-where-inp','shop-link-inp'].forEach(id => document.getElementById(id).value = '');
 }
 function toggleShop(id) {
   const item = shopItems.find(s => s.id === id);
@@ -1058,7 +1151,9 @@ function renderShop() {
         <div class="shop-n">${s.name}</div>
         ${s.where ? `<div class="shop-w">${s.where}</div>` : ''}
         <span class="shop-owner-tag owner-${owner}">${ownerLabel[owner]}</span>
+        ${s.link ? `<span class="shop-w" style="cursor:pointer;color:var(--accent);margin-left:8px" onclick='window.open(${JSON.stringify(s.link)},"_blank")'>🔗 來源</span>` : ''}
       </div>
+      <button class="shop-del" onclick="editShopItem(${s.id})" title="編輯" style="font-size:11px;color:var(--ink-3)">✎</button>
       <button class="shop-del" onclick="deleteShop(${s.id})">×</button>
     </div>`;
   }).join('');
