@@ -748,7 +748,15 @@ async function deleteSpot(id) {
   if (!confirm('確定刪除？')) return;
   spots = spots.filter(s => s.id !== id);
   renderSpots();
+  if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
   if (dbReady()) await sb.from('spots').delete().eq('id', id);
+}
+
+// 由「行程」分頁編輯：先跳返「景點 & 食物」分頁，再打開編輯表格
+function editFromItinerary(id) {
+  const spotsTabBtn = document.querySelector('.nav-btn');
+  switchTab('spots', spotsTabBtn);
+  editSpot(id);
 }
 
 function openMap(spot) {
@@ -993,6 +1001,8 @@ function renderItinerary() {
             ${s.hours ? `<span>${s.hours}</span>` : ''}
             ${s.note  ? `<span>${s.note}</span>`  : ''}
             <button class="map-btn" onclick='openMap(${JSON.stringify(s)})'>Maps →</button>
+            <button class="map-btn" onclick="editFromItinerary(${s.id})">✎ 編輯</button>
+            <button class="map-btn" onclick="deleteSpot(${s.id})">× 刪除</button>
           </div>
         </div>`).join('');
     }
