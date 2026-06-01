@@ -1005,7 +1005,6 @@ function dayRouteUrl(daySpots) {
 }
 
 function dayEmbedUrl(daySpots) {
-  if (!daySpots.length) return null;
   const hotelC = { lat: 25.0505, lng: 121.5775 }; // 台北松河璞旅（饒河街附近）
   const coords = daySpots.map(getCoord).filter(Boolean).slice(0, 8);
   const origin = `${hotelC.lat},${hotelC.lng}`;
