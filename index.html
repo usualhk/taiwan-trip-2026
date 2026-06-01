@@ -1005,15 +1005,18 @@ function dayRouteUrl(daySpots) {
 }
 
 function dayEmbedUrl(daySpots) {
-  const hotel = '台北松河璞旅';
   if (!daySpots.length) return null;
-  const stopStr = s => {
-    const c = getCoord(s);
-    return c ? `${c.lat},${c.lng}` : s.name;
-  };
-  const stops = daySpots.slice(0, 8).map(stopStr);
-  const daddr = [...stops, hotel].map(encodeURIComponent).join('+to:');
-  return `https://maps.google.com/maps?saddr=${encodeURIComponent(hotel)}&daddr=${daddr}&output=embed`;
+  const hotelC = { lat: 25.0505, lng: 121.5775 }; // 台北松河璞旅（饒河街附近）
+  const coords = daySpots.map(getCoord).filter(Boolean).slice(0, 8);
+  const origin = `${hotelC.lat},${hotelC.lng}`;
+  if (coords.length) {
+    // 全部用座標，地圖先至會 zoom 去台北而唔係世界圖
+    const stops = coords.map(c => `${c.lat},${c.lng}`);
+    const daddr = [...stops, origin].map(encodeURIComponent).join('+to:');
+    return `https://maps.google.com/maps?saddr=${encodeURIComponent(origin)}&daddr=${daddr}&output=embed`;
+  }
+  // 當日景點未有座標：起碼 center 喺酒店一帶
+  return `https://maps.google.com/maps?q=${origin}&z=13&output=embed`;
 }
 
 function renderItinerary() {
