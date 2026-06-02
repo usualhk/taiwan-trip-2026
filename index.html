@@ -616,7 +616,7 @@ main { overflow-x: hidden; }
       <div class="fg"><label>訂位狀態（唔剔＝唔顯示）</label>
         <div class="chk-row">
           <label class="chk-lbl"><input type="checkbox" id="inp-book-yes" onclick="onBookCheck('yes')"> ✅ 已訂位</label>
-          <label class="chk-lbl"><input type="checkbox" id="inp-book-no" onclick="onBookCheck('no')"> ⚠ 未訂位</label>
+          <label class="chk-lbl"><input type="checkbox" id="inp-book-no" onclick="onBookCheck('no')"> ⚠️ 未訂位</label>
         </div>
       </div>
       <div class="fg"><label>時段（自動排序）</label>
@@ -726,7 +726,7 @@ const ownerLabel = { together: '一齊買！', shy: 'Shy', christy: 'Christy' };
 
 /* ─── 訂位狀態：未訂位 ↔ 已訂位（撳一下切換） ─── */
 const BOOK_ORDER = ['no', 'yes'];
-const BOOK_LABEL = { no: '⚠ 未訂位！記得訂', yes: '✅ 已訂位' };
+const BOOK_LABEL = { no: '⚠️ 未訂位！記得訂', yes: '✅ 已訂位' };
 const BOOK_STYLE = {
   no:  'color:#fff;border-color:#a03020;background:#a03020;font-weight:600;letter-spacing:0.5px',
   yes: 'color:#2e7d32;border-color:#2e7d32;background:rgba(46,125,50,0.12)'
@@ -801,7 +801,7 @@ async function maybeMigrate() {
 async function initDB() {
   if (!SUPABASE_URL.startsWith('http')) {
     document.body.insertAdjacentHTML('afterbegin',
-      '<div style="background:#a03020;color:#fff;padding:10px 16px;font-family:monospace;font-size:12px;text-align:center">⚠ 未設定 Supabase — 資料未能共用。請喺 index.html 頂部貼上 SUPABASE_URL 同 ANON_KEY。</div>');
+      '<div style="background:#a03020;color:#fff;padding:10px 16px;font-family:monospace;font-size:12px;text-align:center">⚠️ 未設定 Supabase — 資料未能共用。請喺 index.html 頂部貼上 SUPABASE_URL 同 ANON_KEY。</div>');
     return;
   }
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
