@@ -601,14 +601,30 @@ main { overflow-x: hidden; }
         <select id="inp-type"><option>景點</option><option>食物</option><option>咖啡店</option><option>酒吧</option><option>肥仔水</option><option>購物</option><option>其他</option></select>
       </div>
     </div>
-    <div class="row" style="grid-template-columns: 1fr 170px;">
+    <div class="row" style="grid-template-columns: 1fr 150px 140px;">
       <div class="fg"><label>來源 link（IG / blog / 文章）</label><input type="text" id="inp-link" placeholder="貼上連結，行程度可以直接撳開"></div>
       <div class="fg"><label>訂位狀態</label>
         <select id="inp-book">
-          <option value="">—（唔顯示）</option>
+          <option value="">預設（食物自動顯示未訂位）</option>
           <option value="no">⚠ 未訂位</option>
           <option value="yes">✅ 已訂位</option>
+          <option value="none">➖ 唔顯示</option>
         </select>
+      </div>
+      <div class="fg"><label>時段（自動排序）</label>
+        <select id="inp-slot">
+          <option value="">不限</option>
+          <option value="am">🌅 早餐 / 早上</option>
+          <option value="noon">🍱 午餐 / 中午</option>
+          <option value="pm">🌙 晚餐 / 夜晚</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="grid-template-columns: auto 1fr;">
+      <div class="fg"><label>固定時間</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;padding:9px 0;white-space:nowrap;cursor:pointer;">
+          <input type="checkbox" id="inp-fixed" style="width:16px;height:16px;cursor:pointer;"> 🔒 重新編排時唔好郁佢
+        </label>
       </div>
     </div>
     <div class="row c4">
@@ -707,20 +723,37 @@ const BOOK_STYLE = {
   no:  'color:#fff;border-color:#a03020;background:#a03020;font-weight:600;letter-spacing:0.5px',
   yes: 'color:#2e7d32;border-color:#2e7d32;background:rgba(46,125,50,0.12)'
 };
-// 顯示邏輯：設咗 no/yes 就用；食物未設定就預設「未訂位」；其餘唔顯示
-function bookState(s) { const b = (s.book === 'no' || s.book === 'yes') ? s.book : ''; return b || (s.type === '食物' ? 'no' : ''); }
+// 顯示邏輯：none=明確唔顯示；no/yes=照設定；食物未設定預設「未訂位」；其餘唔顯示
+function bookState(s) {
+  if (s.book === 'none') return '';
+  if (s.book === 'no' || s.book === 'yes') return s.book;
+  return s.type === '食物' ? 'no' : '';
+}
 function bookTag(s) {
   const bs = bookState(s);
   if (!bs) return '';
   return `<span class="tag book-${bs}" style="cursor:pointer;${BOOK_STYLE[bs]}" onclick="cycleBook(${s.id})">${BOOK_LABEL[bs]}</span>`;
+}
+// 固定時間：重新編排時唔郁
+function fixedTag(s) {
+  return s.fixed ? `<span class="tag" style="color:#fff;border-color:#6a6760;background:#6a6760">🔒 固定時間</span>` : '';
+}
+// 時段：早餐自動排前、晚餐自動排後
+const SLOT_LABEL = { am: '🌅 早餐', noon: '🍱 午餐', pm: '🌙 晚餐' };
+const SLOT_RANK  = { am: 0, noon: 1, pm: 2 };
+function slotRank(s) { return s.slot in SLOT_RANK ? SLOT_RANK[s.slot] : 1.5; } // 不限放中間
+function slotTag(s) {
+  return s.slot && SLOT_LABEL[s.slot]
+    ? `<span class="tag" style="color:#b5760d;border-color:rgba(181,118,13,0.4);background:rgba(181,118,13,0.07)">${SLOT_LABEL[s.slot]}</span>`
+    : '';
 }
 
 /* ─── Supabase 連線 + 資料同步 ───────────── */
 let sb = null;
 const dbReady = () => sb !== null;
 
-const spotToRow = s => ({ id: s.id, name: s.name, addr: s.addr, type: s.type, day: String(s.day), note: s.note, hours: s.hours, link: s.link || '', book: s.book || null, ord: s.order });
-const rowToSpot = r => ({ id: r.id, name: r.name, addr: r.addr, type: r.type, day: r.day === 'auto' ? 'auto' : Number(r.day), note: r.note, hours: r.hours, link: r.link || '', book: r.book || (r.booked ? 'yes' : ''), order: r.ord });
+const spotToRow = s => ({ id: s.id, name: s.name, addr: s.addr, type: s.type, day: String(s.day), note: s.note, hours: s.hours, link: s.link || '', book: s.book || null, fixed: !!s.fixed, slot: s.slot || null, ord: s.order });
+const rowToSpot = r => ({ id: r.id, name: r.name, addr: r.addr, type: r.type, day: r.day === 'auto' ? 'auto' : Number(r.day), note: r.note, hours: r.hours, link: r.link || '', book: r.book || (r.booked ? 'yes' : ''), fixed: !!r.fixed, slot: r.slot || '', order: r.ord });
 const shopToRow = s => ({ id: s.id, name: s.name, place: s.where, owner: s.owner, link: s.link || '', done: s.done });
 const rowToShop = r => ({ id: r.id, name: r.name, where: r.place, owner: r.owner, link: r.link || '', done: r.done });
 
@@ -794,20 +827,24 @@ function addSpot() {
   const hours = document.getElementById('inp-hours').value.trim();
   const link  = document.getElementById('inp-link').value.trim();
   const book  = document.getElementById('inp-book').value;
+  const fixed = document.getElementById('inp-fixed').checked;
+  const slot  = document.getElementById('inp-slot').value;
   if (!name) return;
   const isEdit = editingSpotId != null;
   if (isEdit) {
     const s = spots.find(x => x.id === editingSpotId);
     if (s) {
       if (s.day !== day) s.order = spots.filter(x => x.day === day).length;
-      Object.assign(s, { name, addr, type, day, note, hours, link, book });
+      Object.assign(s, { name, addr, type, day, note, hours, link, book, fixed, slot });
     }
     cancelEdit();
   } else {
-    spots.push({ id: Date.now(), name, addr, type, day, note, hours, link, book, order: spots.filter(s => s.day === day).length });
+    spots.push({ id: Date.now(), name, addr, type, day, note, hours, link, book, fixed, slot, order: spots.filter(s => s.day === day).length });
   }
   ['inp-name','inp-addr','inp-note','inp-hours','inp-link'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('inp-book').value = '';
+  document.getElementById('inp-fixed').checked = false;
+  document.getElementById('inp-slot').value = '';
   // 新增時揀「由你決定」就即刻按距離自動編排到某一日，唔留喺待編排
   if (!isEdit && day === 'auto') {
     autoAssignDays(true);   // 內部會 save() + renderSpots()
@@ -829,6 +866,8 @@ function editSpot(id) {
   document.getElementById('inp-note').value  = s.note || '';
   document.getElementById('inp-link').value  = s.link || '';
   document.getElementById('inp-book').value   = s.book || '';
+  document.getElementById('inp-fixed').checked = !!s.fixed;
+  document.getElementById('inp-slot').value    = s.slot || '';
   document.getElementById('spot-submit').textContent = '更新';
   document.getElementById('spot-cancel').style.display = 'inline-block';
   document.getElementById('inp-name').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -841,6 +880,8 @@ function cancelEdit() {
   document.getElementById('spot-cancel').style.display = 'none';
   ['inp-name','inp-addr','inp-note','inp-hours','inp-link'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('inp-book').value = '';
+  document.getElementById('inp-fixed').checked = false;
+  document.getElementById('inp-slot').value = '';
 }
 
 async function deleteSpot(id) {
@@ -917,6 +958,8 @@ function renderSpots() {
           <span class="tag tag-${s.type}">${s.type}</span>
           <span class="tag tag-其他">${s.day === 'auto' ? '待編排' : 'Day ' + s.day}</span>
           ${bookTag(s)}
+          ${fixedTag(s)}
+          ${slotTag(s)}
           ${s.link ? `<span style="cursor:pointer;color:var(--accent)" onclick='window.open(${JSON.stringify(s.link)},"_blank")'>🔗 來源</span>` : ''}
           ${s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
           ${s.hours ? `<span>${s.hours}</span>` : ''}
@@ -936,7 +979,8 @@ function optimizeDay() {
   let target = dayFilter ? spots.filter(s => s.day === dayFilter) : spots;
   if (!target.length) return;
   const ord = { '景點':0, '咖啡店':1, '食物':2, '肥仔水':3, '酒吧':4, '購物':5, '其他':6 };
-  target.sort((a, b) => (ord[a.type]||9) - (ord[b.type]||9));
+  // 先按時段（早餐排前、晚餐排後），同時段先按類型
+  target.sort((a, b) => slotRank(a) - slotRank(b) || (ord[a.type]||9) - (ord[b.type]||9));
   target.forEach((s, i) => { const sp = spots.find(x => x.id === s.id); if (sp) sp.order = i; });
   save(); renderSpots();
 }
@@ -1040,7 +1084,9 @@ function autoAssignDays(silent) {
 
   autoSpots.forEach(s => delete s._c);
   [1,2,3,4,5].forEach(d => {
-    spots.filter(x => x.day === d).forEach((s, i) => s.order = i);
+    spots.filter(x => x.day === d)
+      .sort((a, b) => slotRank(a) - slotRank(b))   // 早餐排前、晚餐排後
+      .forEach((s, i) => s.order = i);
   });
 
   save(); renderSpots();
@@ -1061,7 +1107,7 @@ function nearestDay(c, cents) {
 
 // 鎖定條件：已訂位 或 有填開放/用餐時間
 function isLockedSpot(s) {
-  return !!(bookState(s) === 'yes' || (s.hours && s.hours.trim()));
+  return !!(bookState(s) === 'yes' || s.fixed);
 }
 
 // 重新編排：保留已訂位 / 固定時間嘅景點唔郁，其餘按距離重新分配
@@ -1105,12 +1151,12 @@ function reArrangeFlexible() {
 
   flex.forEach(s => delete s._c);
 
-  // 每日重新排序：鎖定（有固定時間）嘅排先、按時間，其餘跟後
+  // 每日重新排序：先按時段（早餐前、晚餐後），鎖定有固定時間嘅按時間
   [1,2,3,4,5].forEach(d => {
     const inDay = spots.filter(x => x.day === d);
     inDay.sort((a, b) => {
+      if (slotRank(a) !== slotRank(b)) return slotRank(a) - slotRank(b);
       const la = isLockedSpot(a), lb = isLockedSpot(b);
-      if (la !== lb) return la ? -1 : 1;
       if (la && lb) return (a.hours || '').localeCompare(b.hours || '');
       return 0;
     });
@@ -1191,7 +1237,7 @@ function renderItinerary() {
     } else {
       html += daySpots.map(s => `
         <div class="tl-item rt-${s.type}">
-          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${bookTag(s)}</div>
+          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${bookTag(s)}${fixedTag(s)}${slotTag(s)}</div>
           ${(s.addr && !/^https?:\/\//.test(s.addr)) || s.hours || s.note ? `<div class="tl-meta">
             ${s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 60 ? s.addr.slice(0,60)+'…' : s.addr}</span>` : ''}
             ${s.hours ? `<span>${s.hours}</span>` : ''}
