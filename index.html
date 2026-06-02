@@ -152,6 +152,14 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
   width: 100%;
   outline: none;
 }
+.fg input[type="checkbox"] {
+  appearance: auto; -webkit-appearance: auto;
+  width: 20px; height: 20px; min-width: 20px;
+  padding: 0; border: 0; background: none;
+  accent-color: var(--accent); cursor: pointer;
+}
+.chk-row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; padding-top: 8px; }
+.chk-lbl { display: flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; white-space: nowrap; }
 .fg input::placeholder { color: var(--ink-3); }
 .fg input:focus, .fg select:focus { border-color: var(--ink-2); }
 .btn-add {
@@ -605,13 +613,11 @@ main { overflow-x: hidden; }
     </div>
     <div class="row r-trip">
       <div class="fg"><label>來源 link（IG / blog / 文章）</label><input type="text" id="inp-link" placeholder="貼上連結，行程度可以直接撳開"></div>
-      <div class="fg"><label>訂位狀態</label>
-        <select id="inp-book">
-          <option value="">預設（食物自動顯示未訂位）</option>
-          <option value="no">⚠ 未訂位</option>
-          <option value="yes">✅ 已訂位</option>
-          <option value="none">➖ 唔顯示</option>
-        </select>
+      <div class="fg"><label>訂位狀態（唔剔＝唔顯示）</label>
+        <div class="chk-row">
+          <label class="chk-lbl"><input type="checkbox" id="inp-book-yes" onclick="onBookCheck('yes')"> ✅ 已訂位</label>
+          <label class="chk-lbl"><input type="checkbox" id="inp-book-no" onclick="onBookCheck('no')"> ⚠ 未訂位</label>
+        </div>
       </div>
       <div class="fg"><label>時段（自動排序）</label>
         <select id="inp-slot">
@@ -725,11 +731,14 @@ const BOOK_STYLE = {
   no:  'color:#fff;border-color:#a03020;background:#a03020;font-weight:600;letter-spacing:0.5px',
   yes: 'color:#2e7d32;border-color:#2e7d32;background:rgba(46,125,50,0.12)'
 };
-// 顯示邏輯：none=明確唔顯示；no/yes=照設定；食物未設定預設「未訂位」；其餘唔顯示
-function bookState(s) {
-  if (s.book === 'none') return '';
-  if (s.book === 'no' || s.book === 'yes') return s.book;
-  return s.type === '食物' ? 'no' : '';
+// 顯示邏輯：剔咗 已訂位/未訂位 先顯示；都冇剔就唔顯示
+function bookState(s) { return (s.book === 'no' || s.book === 'yes') ? s.book : ''; }
+// 兩個剔互斥：剔一個就熄另一個
+function onBookCheck(which) {
+  const yes = document.getElementById('inp-book-yes');
+  const no  = document.getElementById('inp-book-no');
+  if (which === 'yes' && yes.checked) no.checked = false;
+  if (which === 'no'  && no.checked)  yes.checked = false;
 }
 function bookTag(s) {
   const bs = bookState(s);
@@ -828,7 +837,8 @@ function addSpot() {
   const note  = document.getElementById('inp-note').value.trim();
   const hours = document.getElementById('inp-hours').value.trim();
   const link  = document.getElementById('inp-link').value.trim();
-  const book  = document.getElementById('inp-book').value;
+  const book  = document.getElementById('inp-book-yes').checked ? 'yes'
+              : document.getElementById('inp-book-no').checked  ? 'no' : '';
   const fixed = document.getElementById('inp-fixed').checked;
   const slot  = document.getElementById('inp-slot').value;
   if (!name) return;
@@ -844,7 +854,8 @@ function addSpot() {
     spots.push({ id: Date.now(), name, addr, type, day, note, hours, link, book, fixed, slot, order: spots.filter(s => s.day === day).length });
   }
   ['inp-name','inp-addr','inp-note','inp-hours','inp-link'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('inp-book').value = '';
+  document.getElementById('inp-book-yes').checked = false;
+  document.getElementById('inp-book-no').checked = false;
   document.getElementById('inp-fixed').checked = false;
   document.getElementById('inp-slot').value = '';
   // 新增時揀「由你決定」就即刻按距離自動編排到某一日，唔留喺待編排
@@ -867,7 +878,8 @@ function editSpot(id) {
   document.getElementById('inp-hours').value = s.hours || '';
   document.getElementById('inp-note').value  = s.note || '';
   document.getElementById('inp-link').value  = s.link || '';
-  document.getElementById('inp-book').value   = s.book || '';
+  document.getElementById('inp-book-yes').checked = s.book === 'yes';
+  document.getElementById('inp-book-no').checked  = s.book === 'no';
   document.getElementById('inp-fixed').checked = !!s.fixed;
   document.getElementById('inp-slot').value    = s.slot || '';
   document.getElementById('spot-submit').textContent = '更新';
@@ -881,7 +893,8 @@ function cancelEdit() {
   document.getElementById('spot-submit').textContent = '加入';
   document.getElementById('spot-cancel').style.display = 'none';
   ['inp-name','inp-addr','inp-note','inp-hours','inp-link'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('inp-book').value = '';
+  document.getElementById('inp-book-yes').checked = false;
+  document.getElementById('inp-book-no').checked = false;
   document.getElementById('inp-fixed').checked = false;
   document.getElementById('inp-slot').value = '';
 }
