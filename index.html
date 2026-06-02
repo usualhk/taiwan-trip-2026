@@ -527,6 +527,41 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
   .shop-w { font-size: 10px; }
   .chk { width: 18px; height: 18px; font-size: 10px; }
 }
+
+/* ═══ 放大字體（全裝置） ═══ */
+body { font-size: 15px; }
+.spot-name { font-size: 17px; }
+.spot-metas { font-size: 12px; }
+.tag { font-size: 11px; }
+.tl-name { font-size: 16px; }
+.tl-meta { font-size: 12px; }
+.map-btn { font-size: 12px; }
+.shop-n { font-size: 16px; }
+.shop-w { font-size: 12px; }
+.shop-prog { font-size: 12px; }
+.ic { font-size: 12px; }
+.f-btn { font-size: 12px; }
+.fg input, .fg select { font-size: 16px; }
+.fg label { font-size: 11px; }
+.lbl { font-size: 11px; }
+.nav-btn { font-size: 13px; }
+.day-datestr { font-size: 19px; }
+.spot-idx { font-size: 12px; }
+.shop-add-row input, .shop-add-row select { font-size: 16px; }
+.sort-lnk { font-size: 11px; }
+
+/* ═══ Mobile：唔好超出介面 ═══ */
+html, body { max-width: 100%; overflow-x: hidden; }
+main { overflow-x: hidden; }
+.spot-row > div { min-width: 0; }
+.spot-metas, .tl-meta { overflow-wrap: anywhere; word-break: break-word; }
+.spot-metas > span, .tl-meta > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.spot-acts { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 680px) {
+  .spot-row { grid-template-columns: 22px 1fr; }
+  .spot-acts { grid-column: 1 / -1; margin-top: 8px; }
+  .tl-meta .map-btn { padding: 4px 0; }
+}
 </style>
 </head>
 <body>
@@ -592,6 +627,7 @@ main { max-width: 760px; margin: 0 auto; padding: 64px 72px; }
   </div>
   <div class="sort-row">
     <button class="sort-lnk" onclick="autoAssignDays()">🤖 自動編排（按距離）</button>
+    <button class="sort-lnk" onclick="reArrangeFlexible()">♻️ 重新編排（鎖定已訂位/固定時間）</button>
     <button class="sort-lnk" onclick="optimizeDay()">↕ 智能排序</button>
   </div>
   <div id="spotsList"></div>
@@ -852,7 +888,7 @@ function renderSpots() {
           <span class="tag tag-其他">${s.day === 'auto' ? '待編排' : 'Day ' + s.day}</span>
           ${(s.type === '食物' || s.booked) ? `<span class="tag" style="cursor:pointer;${s.booked ? 'color:#2e7d32;border-color:#2e7d32;background:rgba(46,125,50,0.12)' : 'color:#a03020;border-color:#a03020;background:rgba(160,48,32,0.08)'}" onclick="toggleBooked(${s.id})">${s.booked ? '✅ 已訂位' : '⚠ 未訂位'}</span>` : ''}
           ${s.link ? `<span style="cursor:pointer;color:var(--accent)" onclick='window.open(${JSON.stringify(s.link)},"_blank")'>🔗 來源</span>` : ''}
-          ${s.addr  ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
+          ${s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
           ${s.hours ? `<span>${s.hours}</span>` : ''}
           ${s.note  ? `<span>${s.note}</span>`  : ''}
         </div>
@@ -993,6 +1029,69 @@ function nearestDay(c, cents) {
   return best;
 }
 
+// 鎖定條件：已訂位 或 有填開放/用餐時間
+function isLockedSpot(s) {
+  return !!(s.booked || (s.hours && s.hours.trim()));
+}
+
+// 重新編排：保留已訂位 / 固定時間嘅景點唔郁，其餘按距離重新分配
+function reArrangeFlexible() {
+  const flex = spots.filter(s => !isLockedSpot(s));
+  if (!flex.length) { alert('冇景點需要重新編排（全部都已訂位或有固定時間）。'); return; }
+  if (!confirm(`會保留已訂位 / 有固定時間嘅景點唔郁，其餘 ${flex.length} 個按距離重新分配。繼續？`)) return;
+
+  const avg = cs => ({ lat: cs.reduce((a,c)=>a+c.lat,0)/cs.length, lng: cs.reduce((a,c)=>a+c.lng,0)/cs.length });
+
+  // 每日錨點：優先用鎖定景點，冇就用嗰日其餘景點
+  const centroids = {};
+  for (let d = 1; d <= 5; d++) {
+    let cs = spots.filter(s => s.day === d && isLockedSpot(s)).map(getCoord).filter(Boolean);
+    if (!cs.length) cs = spots.filter(s => s.day === d).map(getCoord).filter(Boolean);
+    if (cs.length) centroids[d] = avg(cs);
+  }
+
+  flex.forEach(s => { s._c = getCoord(s); });
+  const withC = flex.filter(s => s._c);
+  const noC = flex.filter(s => !s._c);
+
+  if (Object.keys(centroids).length) {
+    withC.forEach(s => { s.day = nearestDay(s._c, centroids); });
+  } else if (withC.length >= 5) {
+    const km = kmeans(withC.map(s => s._c), 5);
+    const order = km.centroids.map((c, i) => ({ c, i })).sort((a, b) => a.c.lng - b.c.lng || a.c.lat - b.c.lat);
+    const cMap = {}; order.forEach((x, i) => { cMap[x.i] = i + 1; });
+    withC.forEach((s, i) => { s.day = cMap[km.assignments[i]]; });
+  } else {
+    withC.sort((a, b) => a._c.lng - b._c.lng || a._c.lat - b._c.lat);
+    withC.forEach((s, i) => { s.day = (i % 5) + 1; });
+  }
+
+  // 冇座標嘅放最少景點嗰日
+  noC.forEach(s => {
+    const counts = [1,2,3,4,5].map(d => ({ d, n: spots.filter(x => x.day === d).length }));
+    counts.sort((a, b) => a.n - b.n);
+    s.day = counts[0].d;
+  });
+
+  flex.forEach(s => delete s._c);
+
+  // 每日重新排序：鎖定（有固定時間）嘅排先、按時間，其餘跟後
+  [1,2,3,4,5].forEach(d => {
+    const inDay = spots.filter(x => x.day === d);
+    inDay.sort((a, b) => {
+      const la = isLockedSpot(a), lb = isLockedSpot(b);
+      if (la !== lb) return la ? -1 : 1;
+      if (la && lb) return (a.hours || '').localeCompare(b.hours || '');
+      return 0;
+    });
+    inDay.forEach((s, i) => s.order = i);
+  });
+
+  save(); renderSpots();
+  if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
+  alert('✓ 已重新編排（已訂位 / 固定時間嘅景點保持唔變）');
+}
+
 function dayRouteUrl(daySpots) {
   const hotel = '台北松河璞旅';
   if (!daySpots.length) return null;
@@ -1064,7 +1163,7 @@ function renderItinerary() {
         <div class="tl-item rt-${s.type}">
           <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${(s.type === '食物' || s.booked) ? `<span class="tag" style="cursor:pointer;${s.booked ? 'color:#2e7d32;border-color:#2e7d32;background:rgba(46,125,50,0.12)' : 'color:#a03020;border-color:#a03020;background:rgba(160,48,32,0.08)'}" onclick="toggleBooked(${s.id})">${s.booked ? '✅ 已訂位' : '⚠ 未訂位'}</span>` : ''}</div>
           <div class="tl-meta">
-            ${s.addr  ? `<span>${s.addr}</span>` : ''}
+            ${s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 60 ? s.addr.slice(0,60)+'…' : s.addr}</span>` : ''}
             ${s.hours ? `<span>${s.hours}</span>` : ''}
             ${s.note  ? `<span>${s.note}</span>`  : ''}
             <button class="map-btn" onclick="moveSpot(${s.id},-1)">↑ 上移</button>
