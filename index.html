@@ -596,6 +596,7 @@ main { overflow-x: hidden; }
     <button class="nav-btn active" onclick="switchTab('spots',this)">景點 &amp; 食物</button>
     <button class="nav-btn" onclick="switchTab('itinerary',this)">行程</button>
     <button class="nav-btn" onclick="switchTab('shopping',this)">購物清單</button>
+    <button class="nav-btn" onclick="switchTab('drinks',this)">🧋 肥仔水</button>
   </nav>
 </header>
 
@@ -705,6 +706,23 @@ main { overflow-x: hidden; }
 </main>
 </div>
 
+<!-- ══ 肥仔水（手搖想飲清單） ══════════════ -->
+<div id="tab-drinks" class="tab-panel">
+<main>
+  <div class="lbl">新增手搖品牌</div>
+  <div class="shop-add-row">
+    <input type="text" id="drink-name-inp" placeholder="品牌，e.g. 五十嵐 / 龜記 / 可不可">
+    <input type="text" id="drink-note-inp" placeholder="推介飲品（可選），e.g. 四季春微糖少冰">
+    <button class="btn-add" id="drink-submit" onclick="addDrink()">加入</button>
+    <button class="sort-lnk" id="drink-cancel" onclick="cancelDrinkEdit()" style="display:none">取消編輯</button>
+  </div>
+  <div class="lbl" style="margin-top:36px">想飲清單</div>
+  <div class="shop-w" style="margin:-8px 0 18px">💡 唔使釘死分店。喺街想飲就撳「🔍 搵附近分店」，地圖會用你當時位置顯示最就腳嗰間。</div>
+  <div class="shop-prog" id="drink-progress">0 / 0 已試</div>
+  <div id="drinkGrid"></div>
+</main>
+</div>
+
 <!-- ══ SHARED STORAGE (Supabase) ══════════ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -717,10 +735,12 @@ const SUPABASE_ANON_KEY = 'sb_publishable_HuiBsc6-GcxV6w8zWjGZ3g_3Gr_Kj_z';
 <script>
 let spots = [];
 let shopItems = [];
+let drinks = [];
 let currentFilter = 'all';
 let currentShopFilter = 'all';
 let editingSpotId = null;
 let editingShopId = null;
+let editingDrinkId = null;
 
 const ownerLabel = { together: '一齊買！', shy: 'Shy', christy: 'Christy' };
 
@@ -767,24 +787,30 @@ const spotToRow = s => ({ id: s.id, name: s.name, addr: s.addr, type: s.type, da
 const rowToSpot = r => ({ id: r.id, name: r.name, addr: r.addr, type: r.type, day: r.day === 'auto' ? 'auto' : Number(r.day), note: r.note, hours: r.hours, link: r.link || '', book: r.book || (r.booked ? 'yes' : ''), fixed: !!r.fixed, slot: r.slot || '', order: r.ord });
 const shopToRow = s => ({ id: s.id, name: s.name, place: s.where, owner: s.owner, link: s.link || '', done: s.done });
 const rowToShop = r => ({ id: r.id, name: r.name, where: r.place, owner: r.owner, link: r.link || '', done: r.done });
+const drinkToRow = d => ({ id: d.id, name: d.name, note: d.note || '', tried: !!d.tried });
+const rowToDrink = r => ({ id: r.id, name: r.name, note: r.note || '', tried: !!r.tried });
 
 async function save() {
   if (!dbReady()) return;
   if (spots.length)     await sb.from('spots').upsert(spots.map(spotToRow));
   if (shopItems.length) await sb.from('shop_items').upsert(shopItems.map(shopToRow));
+  if (drinks.length)    await sb.from('drinks').upsert(drinks.map(drinkToRow));
 }
 
 async function loadAll() {
   if (!dbReady()) return;
-  const [{ data: sp }, { data: sh }] = await Promise.all([
+  const [{ data: sp }, { data: sh }, { data: dr }] = await Promise.all([
     sb.from('spots').select('*'),
-    sb.from('shop_items').select('*')
+    sb.from('shop_items').select('*'),
+    sb.from('drinks').select('*')
   ]);
   spots     = (sp || []).map(rowToSpot);
   shopItems = (sh || []).map(rowToShop);
+  drinks    = (dr || []).map(rowToDrink);
   renderSpots();
   if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
   if (document.getElementById('tab-shopping').classList.contains('active'))   renderShop();
+  if (document.getElementById('tab-drinks').classList.contains('active'))     renderDrinks();
 }
 
 // 一次性：如果雲端係空但本機有舊資料，自動搬上雲端
@@ -810,6 +836,7 @@ async function initDB() {
   sb.channel('trip-sync')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'spots' },      loadAll)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'shop_items' },  loadAll)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'drinks' },      loadAll)
     .subscribe();
 }
 
@@ -825,6 +852,7 @@ function switchTab(tab, btn) {
   btn.classList.add('active');
   if (tab === 'itinerary') renderItinerary();
   if (tab === 'shopping') renderShop();
+  if (tab === 'drinks') renderDrinks();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1351,6 +1379,73 @@ function renderShop() {
       <button class="shop-del" onclick="deleteShop(${s.id})">×</button>
     </div>`;
   }).join('');
+}
+
+/* ─── 肥仔水（手搖想飲清單） ───────────── */
+function addDrink() {
+  const name = document.getElementById('drink-name-inp').value.trim();
+  const note = document.getElementById('drink-note-inp').value.trim();
+  if (!name) return;
+  if (editingDrinkId != null) {
+    const d = drinks.find(x => x.id === editingDrinkId);
+    if (d) Object.assign(d, { name, note });
+    cancelDrinkEdit();
+  } else {
+    drinks.push({ id: Date.now(), name, note, tried: false });
+  }
+  ['drink-name-inp','drink-note-inp'].forEach(id => document.getElementById(id).value = '');
+  save();
+  renderDrinks();
+}
+function editDrink(id) {
+  const d = drinks.find(x => x.id === id);
+  if (!d) return;
+  editingDrinkId = id;
+  document.getElementById('drink-name-inp').value = d.name || '';
+  document.getElementById('drink-note-inp').value = d.note || '';
+  document.getElementById('drink-submit').textContent = '更新';
+  document.getElementById('drink-cancel').style.display = 'inline-block';
+  document.getElementById('drink-name-inp').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('drink-name-inp').focus();
+}
+function cancelDrinkEdit() {
+  editingDrinkId = null;
+  document.getElementById('drink-submit').textContent = '加入';
+  document.getElementById('drink-cancel').style.display = 'none';
+  ['drink-name-inp','drink-note-inp'].forEach(id => document.getElementById(id).value = '');
+}
+function toggleDrink(id) {
+  const d = drinks.find(x => x.id === id);
+  if (d) { d.tried = !d.tried; save(); renderDrinks(); }
+}
+async function deleteDrink(id) {
+  drinks = drinks.filter(d => d.id !== id);
+  renderDrinks();
+  if (dbReady()) await sb.from('drinks').delete().eq('id', id);
+}
+// 搵附近分店：開 Google Maps 搜尋品牌，手機會用當時位置顯示最近嗰間
+function findDrinkBranch(name) {
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`, '_blank');
+}
+function renderDrinks() {
+  const tried = drinks.filter(d => d.tried).length;
+  document.getElementById('drink-progress').textContent = `${tried} / ${drinks.length} 已試`;
+  const grid = document.getElementById('drinkGrid');
+  if (!drinks.length) {
+    grid.innerHTML = '<div class="empty">— 仲未有手搖 —</div>';
+    return;
+  }
+  grid.innerHTML = drinks.map(d => `
+    <div class="shop-row${d.tried ? ' done' : ''}">
+      <div class="chk${d.tried ? ' on' : ''}" onclick="toggleDrink(${d.id})">${d.tried ? '✓' : ''}</div>
+      <div style="flex:1;min-width:0">
+        <div class="shop-n">${d.name}</div>
+        ${d.note ? `<div class="shop-w">${d.note}</div>` : ''}
+        <span class="shop-w" style="cursor:pointer;color:var(--accent);display:inline-block;margin-top:5px;border:1px solid rgba(92,122,82,0.4);padding:3px 10px" onclick='findDrinkBranch(${JSON.stringify(d.name)})'>🔍 搵附近分店</span>
+      </div>
+      <button class="shop-del" onclick="editDrink(${d.id})" title="編輯" style="font-size:11px;color:var(--ink-3)">✎</button>
+      <button class="shop-del" onclick="deleteDrink(${d.id})">×</button>
+    </div>`).join('');
 }
 
 renderSpots();
