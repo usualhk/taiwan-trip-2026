@@ -903,7 +903,7 @@ function addSpot() {
   document.getElementById('inp-slot').value = '';
   // 新增時揀「由你決定」就即刻按距離自動編排到某一日，唔留喺待編排
   if (!isEdit && day === 'auto') {
-    autoAssignDays(true);   // 內部會 save() + renderSpots()
+    autoAssignDays(true, true);   // 內部會 save() + renderSpots()（加地點唔自動叫 API）
   } else {
     save();
     renderSpots();
@@ -1238,6 +1238,27 @@ async function suggestAllBranches() {
   alert(`✓ 已為 ${ok}/${pend.length} 間連鎖店搵到最近分店。`);
 }
 
+// 重新編排時自動幫「分店未定」嘅連鎖店搵最近分店（靜默版，唔彈確認）
+async function resolvePendingChains(silent) {
+  const pend = spots.filter(isPendingChain);
+  if (!pend.length) return 0;
+  if (!GOOGLE_MAPS_API_KEY) {
+    if (!silent) alert('未設定 Google Maps API key，未能自動搵分店。');
+    return 0;
+  }
+  let ok = 0;
+  for (const s of pend) {
+    const query  = getChainName(s) || s.name;
+    const anchor = anchorForChain(s);
+    if (!anchor) continue;
+    try {
+      const places = await searchNearestBranch(query, anchor);
+      if (places.length) { applyBranch(s, places[0]); ok++; }
+    } catch (e) { /* 跳過呢間，唔阻住排程 */ }
+  }
+  return ok;
+}
+
 function kmeans(pts, k) {
   if (pts.length <= k) return { centroids: pts.slice(), assignments: pts.map((_, i) => i) };
   const sorted = [...pts].sort((a, b) => a.lng - b.lng);
@@ -1264,7 +1285,8 @@ function kmeans(pts, k) {
   return { centroids: cents, assignments: assigns };
 }
 
-function autoAssignDays(silent) {
+async function autoAssignDays(silent, skipResolve) {
+  if (!skipResolve) await resolvePendingChains(silent);   // 先自動搵埋待定連鎖店分店
   const autoSpots = spots.filter(s => s.day === 'auto');
   if (!autoSpots.length) { if (!silent) alert('冇地點要編排。先喺日期揀「🤖 由你決定」。'); return; }
 
@@ -1361,10 +1383,11 @@ function isLockedSpot(s) {
 }
 
 // 重新編排：保留已訂位 / 固定時間嘅景點唔郁，其餘按距離重新分配
-function reArrangeFlexible() {
+async function reArrangeFlexible() {
   const flex = spots.filter(s => !isLockedSpot(s));
   if (!flex.length) { alert('冇景點需要重新編排（全部都已訂位或有固定時間）。'); return; }
   if (!confirm(`會保留已訂位 / 有固定時間嘅景點唔郁，其餘 ${flex.length} 個按距離重新分配。繼續？`)) return;
+  await resolvePendingChains(false);   // 先自動搵埋待定連鎖店分店，再按距離排
 
   const avg = cs => ({ lat: cs.reduce((a,c)=>a+c.lat,0)/cs.length, lng: cs.reduce((a,c)=>a+c.lng,0)/cs.length });
 
