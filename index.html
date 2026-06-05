@@ -1170,14 +1170,29 @@ async function searchNearestBranch(query, anchor) {
   return places;
 }
 
+// 由 Places 結果抽出「分店」標籤：優先用店名去掉連鎖名嘅部分，其次用地址嘅「區」
+function branchLabel(top, chain) {
+  let disp = (top.displayName && top.displayName.text) || top.displayName || '';
+  let b = disp;
+  if (chain && b.startsWith(chain)) {
+    b = b.slice(chain.length).replace(/^[\s\-—·、,，()（）]+/, '').replace(/[\s）)]+$/, '').trim();
+  }
+  if (b && b !== chain) return b;
+  const fa = top.formattedAddress || '';
+  let m = fa.match(/[市縣]([一-龥]{1,3}區)/) || fa.match(/([一-龥]{1,3}區)/);  // e.g. 信義區
+  if (m) return m[1];
+  return disp || '分店';
+}
+
 function applyBranch(s, top) {
-  const loc   = { lat: top.location.lat(), lng: top.location.lng() };
-  const bname = (top.displayName && top.displayName.text) || top.displayName || getChainName(s) || s.name;
-  const baddr = top.formattedAddress || '';
-  s.name = bname;
+  const loc    = { lat: top.location.lat(), lng: top.location.lng() };
+  const chain  = getChainName(s) || s.name;   // 趁 addr 仲係 marker 時攞返連鎖名
+  const branch = branchLabel(top, chain);
+  const baddr  = top.formattedAddress || '';
+  s.name = `${chain} — ${branch}`;             // 名格式：連鎖名 — 分店
   s.addr = `${baddr} @${loc.lat},${loc.lng}`.trim();   // 帶 @lat,lng 令 getCoord 認到
   if (!s.link) s.link = `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
-  return { bname, baddr, km: (top._d / 1000).toFixed(1) };
+  return { bname: s.name, branch, baddr, km: (top._d / 1000).toFixed(1) };
 }
 
 // 單間：建議最近分店
