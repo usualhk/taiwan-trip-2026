@@ -915,7 +915,7 @@ function editSpot(id) {
   if (!s) return;
   editingSpotId = id;
   document.getElementById('inp-name').value  = s.name || '';
-  document.getElementById('inp-addr').value  = isPendingChain(s) ? '' : (s.addr || '');
+  document.getElementById('inp-addr').value  = realAddr(s);
   document.getElementById('inp-type').value  = s.type || '景點';
   document.getElementById('inp-day').value   = s.day != null ? String(s.day) : 'auto';
   document.getElementById('inp-hours').value = s.hours || '';
@@ -990,9 +990,10 @@ function cycleBook(id) {
 }
 
 function openMap(spot) {
-  const url = (spot.addr && spot.addr.startsWith('http'))
-    ? spot.addr
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((spot.name + ' ' + (spot.addr || '')).trim())}`;
+  const a = realAddr(spot);   // 去掉連鎖 marker
+  const url = (a && a.startsWith('http'))
+    ? a
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((spot.name + ' ' + a).trim())}`;
   window.open(url, '_blank');
 }
 
@@ -1023,14 +1024,15 @@ function renderSpots() {
           ${fixedTag(s)}
           ${slotTag(s)}
           ${isPendingChain(s) ? `<span class="tag tag-其他">🔗 分店待定·${getChainName(s)}</span>` : ''}
+          ${isResolvedChain(s) ? `<span class="tag tag-其他">🔁 自動分店</span>` : ''}
           ${s.link ? `<span style="cursor:pointer;color:var(--accent)" onclick='window.open(${JSON.stringify(s.link)},"_blank")'>🔗 來源</span>` : ''}
-          ${!isPendingChain(s) && s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
+          ${addrMeta(s, 48)}
           ${s.hours ? `<span>${s.hours}</span>` : ''}
           ${s.note  ? `<span>${s.note}</span>`  : ''}
         </div>
       </div>
       <div class="spot-acts">
-        ${isPendingChain(s) ? `<button class="ic" onclick="suggestBranch(${s.id})">📍 最近分店</button>` : ''}
+        ${isChain(s) ? `<button class="ic" onclick="suggestBranch(${s.id})">📍 ${isPendingChain(s) ? '最近分店' : '重揾分店'}</button>` : ''}
         <button class="ic" onclick='openMap(${JSON.stringify(s)})'>Maps</button>
         <button class="ic" onclick="editSpot(${s.id})">✎</button>
         <button class="ic del" onclick="deleteSpot(${s.id})">×</button>
@@ -1083,12 +1085,31 @@ function getCoord(spot) {
 
 /* ═══ 連鎖店：分店未定 → 按行程自動搵最近嗰間 ═══════════════ */
 
-const CHAIN_PREFIX = '🔗待定·';   // 存喺 addr 嘅 marker（唔使改 Supabase schema）
+const CHAIN_PREFIX    = '🔗待定·';   // addr marker：分店未定（唔使改 Supabase schema）
+const RESOLVED_PREFIX = '🔁';        // addr marker：已定連鎖店，格式 🔁連鎖名｜真實地址 @lat,lng
 function isPendingChain(s) {
   return !!(s && typeof s.addr === 'string' && s.addr.startsWith(CHAIN_PREFIX));
 }
+function isResolvedChain(s) {
+  return !!(s && typeof s.addr === 'string' && s.addr.startsWith(RESOLVED_PREFIX));
+}
+function isChain(s) { return isPendingChain(s) || isResolvedChain(s); }
 function getChainName(s) {
-  return isPendingChain(s) ? s.addr.slice(CHAIN_PREFIX.length).trim() : '';
+  if (isPendingChain(s))  return s.addr.slice(CHAIN_PREFIX.length).trim();
+  if (isResolvedChain(s)) { const m = s.addr.match(/^🔁([^｜]*)｜/); return m ? m[1].trim() : ''; }
+  return '';
+}
+// 顯示用：拎返真實地址（去掉連鎖 marker；待定就空）
+function realAddr(s) {
+  if (!s || !s.addr) return '';
+  if (isPendingChain(s))  return '';
+  if (isResolvedChain(s)) return s.addr.replace(/^🔁[^｜]*｜/, '').replace(/\s*@-?\d+\.\d+,-?\d+\.\d+\s*$/, '');
+  return s.addr;
+}
+function addrMeta(s, max) {
+  const a = realAddr(s);
+  if (!a || /^https?:\/\//.test(a)) return '';
+  return `<span>${a.length > max ? a.slice(0, max) + '…' : a}</span>`;
 }
 
 // 表單：剔咗「連鎖店」就唔使填地址
@@ -1186,11 +1207,12 @@ function branchLabel(top, chain) {
 
 function applyBranch(s, top) {
   const loc    = { lat: top.location.lat(), lng: top.location.lng() };
-  const chain  = getChainName(s) || s.name;   // 趁 addr 仲係 marker 時攞返連鎖名
+  const chain  = getChainName(s) || (s.name.split(' — ')[0]) || s.name;   // 由 marker 或名攞返連鎖名
   const branch = branchLabel(top, chain);
   const baddr  = top.formattedAddress || '';
   s.name = `${chain} — ${branch}`;             // 名格式：連鎖名 — 分店
-  s.addr = `${baddr} @${loc.lat},${loc.lng}`.trim();   // 帶 @lat,lng 令 getCoord 認到
+  // 存返 marker：記住係連鎖店同連鎖名，等之後重新編排可以重揀；@lat,lng 令 getCoord 認到
+  s.addr = `${RESOLVED_PREFIX}${chain}｜${baddr} @${loc.lat},${loc.lng}`.trim();
   if (!s.link) s.link = `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
   return { bname: s.name, branch, baddr, km: (top._d / 1000).toFixed(1) };
 }
@@ -1198,7 +1220,7 @@ function applyBranch(s, top) {
 // 單間：建議最近分店
 async function suggestBranch(id) {
   const s = spots.find(x => x.id === id);
-  if (!s || !isPendingChain(s)) return;
+  if (!s || !isChain(s)) return;
   const query  = getChainName(s) || s.name;
   const anchor = anchorForChain(s);
   if (!anchor) {
@@ -1253,16 +1275,17 @@ async function suggestAllBranches() {
   alert(`✓ 已為 ${ok}/${pend.length} 間連鎖店搵到最近分店。`);
 }
 
-// 重新編排時自動幫「分店未定」嘅連鎖店搵最近分店（靜默版，唔彈確認）
-async function resolvePendingChains(silent) {
-  const pend = spots.filter(isPendingChain);
-  if (!pend.length) return 0;
+// 編排時自動幫連鎖店揾／重揾最近分店（靜默版，唔彈確認）
+// filterFn 決定處理邊啲：isPendingChain = 只新待定；isChain = 連已定都重揀
+async function resolveChains(filterFn, silent) {
+  const list = spots.filter(filterFn);
+  if (!list.length) return 0;
   if (!GOOGLE_MAPS_API_KEY) {
     if (!silent) alert('未設定 Google Maps API key，未能自動搵分店。');
     return 0;
   }
   let ok = 0;
-  for (const s of pend) {
+  for (const s of list) {
     const query  = getChainName(s) || s.name;
     const anchor = anchorForChain(s);
     if (!anchor) continue;
@@ -1301,7 +1324,6 @@ function kmeans(pts, k) {
 }
 
 async function autoAssignDays(silent, skipResolve) {
-  if (!skipResolve) await resolvePendingChains(silent);   // 先自動搵埋待定連鎖店分店
   const autoSpots = spots.filter(s => s.day === 'auto');
   if (!autoSpots.length) { if (!silent) alert('冇地點要編排。先喺日期揀「🤖 由你決定」。'); return; }
 
@@ -1343,6 +1365,8 @@ async function autoAssignDays(silent, skipResolve) {
 
   autoSpots.forEach(s => delete s._c);
   enforceDaySlotRules(autoSpots);   // Day1 唔擺早上、Day5 唔擺夜晚
+  // 幫新加嘅「待定」連鎖店按分到嘅日子揾就腳分店（已定嘅唔郁——交畀「重新編排」先重揀）
+  if (!skipResolve) await resolveChains(s => isPendingChain(s) && !isLockedSpot(s), silent);
   [1,2,3,4,5].forEach(d => {
     spots.filter(x => x.day === d)
       .sort((a, b) => slotRank(a) - slotRank(b))   // 早餐排前、晚餐排後
@@ -1402,7 +1426,6 @@ async function reArrangeFlexible() {
   const flex = spots.filter(s => !isLockedSpot(s));
   if (!flex.length) { alert('冇景點需要重新編排（全部都已訂位或有固定時間）。'); return; }
   if (!confirm(`會保留已訂位 / 有固定時間嘅景點唔郁，其餘 ${flex.length} 個按距離重新分配。繼續？`)) return;
-  await resolvePendingChains(false);   // 先自動搵埋待定連鎖店分店，再按距離排
 
   const avg = cs => ({ lat: cs.reduce((a,c)=>a+c.lat,0)/cs.length, lng: cs.reduce((a,c)=>a+c.lng,0)/cs.length });
 
@@ -1439,6 +1462,9 @@ async function reArrangeFlexible() {
 
   flex.forEach(s => delete s._c);
   enforceDaySlotRules(flex);   // Day1 唔擺早上、Day5 唔擺夜晚
+
+  // 順便幫所有連鎖店（連已定嘅）按而家嘅日子重揾最就腳分店（已訂位/固定時間嘅唔郁）
+  await resolveChains(s => isChain(s) && !isLockedSpot(s), false);
 
   // 每日重新排序：先按時段（早餐前、晚餐後），鎖定有固定時間嘅按時間
   [1,2,3,4,5].forEach(d => {
@@ -1526,14 +1552,14 @@ function renderItinerary() {
     } else {
       html += daySpots.map(s => `
         <div class="tl-item rt-${s.type}">
-          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${bookTag(s)}${fixedTag(s)}${slotTag(s)}${isPendingChain(s) ? `<span class="tag tag-其他">🔗 分店待定</span>` : ''}</div>
-          ${(!isPendingChain(s) && s.addr && !/^https?:\/\//.test(s.addr)) || s.hours || s.note ? `<div class="tl-meta">
-            ${!isPendingChain(s) && s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 60 ? s.addr.slice(0,60)+'…' : s.addr}</span>` : ''}
+          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${bookTag(s)}${fixedTag(s)}${slotTag(s)}${isPendingChain(s) ? `<span class="tag tag-其他">🔗 分店待定</span>` : ''}${isResolvedChain(s) ? `<span class="tag tag-其他">🔁 自動分店</span>` : ''}</div>
+          ${realAddr(s) && !/^https?:\/\//.test(realAddr(s)) || s.hours || s.note ? `<div class="tl-meta">
+            ${addrMeta(s, 60)}
             ${s.hours ? `<span>${s.hours}</span>` : ''}
             ${s.note  ? `<span>${s.note}</span>`  : ''}
           </div>` : ''}
           <div class="tl-actions">
-            ${isPendingChain(s) ? `<button class="map-btn" onclick="suggestBranch(${s.id})">📍 最近分店</button>` : ''}
+            ${isChain(s) ? `<button class="map-btn" onclick="suggestBranch(${s.id})">📍 ${isPendingChain(s) ? '最近分店' : '重揾分店'}</button>` : ''}
             <button class="map-btn" onclick="moveSpot(${s.id},-1)">↑ 上移</button>
             <button class="map-btn" onclick="moveSpot(${s.id},1)">↓ 下移</button>
             <button class="map-btn" onclick='openMap(${JSON.stringify(s)})'>Maps →</button>
