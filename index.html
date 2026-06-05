@@ -630,9 +630,12 @@ main { overflow-x: hidden; }
       </div>
     </div>
     <div class="row r-fixed">
-      <div class="fg"><label>固定時間</label>
+      <div class="fg"><label>固定時間 / 連鎖店</label>
         <label style="display:flex;align-items:center;gap:8px;font-size:14px;padding:9px 0;white-space:nowrap;cursor:pointer;">
           <input type="checkbox" id="inp-fixed" style="width:16px;height:16px;cursor:pointer;"> 🔒 重新編排時唔好郁佢
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;padding:2px 0 9px;cursor:pointer;">
+          <input type="checkbox" id="inp-chain" onclick="onChainToggle()" style="width:16px;height:16px;cursor:pointer;"> 🔗 連鎖店（分店未定，之後按行程自動搵最近嗰間）
         </label>
       </div>
     </div>
@@ -668,6 +671,7 @@ main { overflow-x: hidden; }
     <button class="sort-lnk" onclick="autoAssignDays()">🤖 自動編排（按距離）</button>
     <button class="sort-lnk" onclick="reArrangeFlexible()">♻️ 重新編排（鎖定已訂位/固定時間）</button>
     <button class="sort-lnk" onclick="optimizeDay()">↕ 智能排序</button>
+    <button class="sort-lnk" onclick="suggestAllBranches()">📍 一鍵搵晒所有待定分店</button>
   </div>
   <div id="spotsList"></div>
 </main>
@@ -730,6 +734,12 @@ main { overflow-x: hidden; }
 /* ▼▼▼ 貼上你嘅 Supabase 資料喺呢兩行（睇下面說明） ▼▼▼ */
 const SUPABASE_URL      = 'https://vflnpgnpcsgjmehlwsil.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_HuiBsc6-GcxV6w8zWjGZ3g_3Gr_Kj_z';
+/* ▲▲▲ ────────────────────────────────────────── ▲▲▲ */
+
+/* ▼▼▼ 連鎖店「自動搵最近分店」要用 Google Maps Places API。 ▼▼▼
+   去 Google Cloud Console 開一個 Maps JavaScript API + Places API 嘅 key，
+   貼喺下面。冇 key 都用得，只係「建議最近分店」會提你要設定。 */
+const GOOGLE_MAPS_API_KEY = '';
 /* ▲▲▲ ────────────────────────────────────────── ▲▲▲ */
 </script>
 
@@ -859,7 +869,9 @@ function switchTab(tab, btn) {
 
 function addSpot() {
   const name  = document.getElementById('inp-name').value.trim();
-  const addr  = document.getElementById('inp-addr').value.trim();
+  let   addr  = document.getElementById('inp-addr').value.trim();
+  const chain = document.getElementById('inp-chain').checked;
+  if (chain) addr = CHAIN_PREFIX + (name || '連鎖店');  // 分店未定：用 marker 存喺 addr，唔使改 DB
   const type  = document.getElementById('inp-type').value;
   const dayV  = document.getElementById('inp-day').value;
   const day   = dayV === 'auto' ? 'auto' : parseInt(dayV);
@@ -886,6 +898,8 @@ function addSpot() {
   document.getElementById('inp-book-yes').checked = false;
   document.getElementById('inp-book-no').checked = false;
   document.getElementById('inp-fixed').checked = false;
+  document.getElementById('inp-chain').checked = false;
+  onChainToggle();
   document.getElementById('inp-slot').value = '';
   // 新增時揀「由你決定」就即刻按距離自動編排到某一日，唔留喺待編排
   if (!isEdit && day === 'auto') {
@@ -901,7 +915,7 @@ function editSpot(id) {
   if (!s) return;
   editingSpotId = id;
   document.getElementById('inp-name').value  = s.name || '';
-  document.getElementById('inp-addr').value  = s.addr || '';
+  document.getElementById('inp-addr').value  = isPendingChain(s) ? '' : (s.addr || '');
   document.getElementById('inp-type').value  = s.type || '景點';
   document.getElementById('inp-day').value   = s.day != null ? String(s.day) : 'auto';
   document.getElementById('inp-hours').value = s.hours || '';
@@ -910,6 +924,8 @@ function editSpot(id) {
   document.getElementById('inp-book-yes').checked = s.book === 'yes';
   document.getElementById('inp-book-no').checked  = s.book === 'no';
   document.getElementById('inp-fixed').checked = !!s.fixed;
+  document.getElementById('inp-chain').checked = isPendingChain(s);
+  onChainToggle();
   document.getElementById('inp-slot').value    = s.slot || '';
   document.getElementById('spot-submit').textContent = '更新';
   document.getElementById('spot-cancel').style.display = 'inline-block';
@@ -925,6 +941,8 @@ function cancelEdit() {
   document.getElementById('inp-book-yes').checked = false;
   document.getElementById('inp-book-no').checked = false;
   document.getElementById('inp-fixed').checked = false;
+  document.getElementById('inp-chain').checked = false;
+  onChainToggle();
   document.getElementById('inp-slot').value = '';
 }
 
@@ -1004,13 +1022,15 @@ function renderSpots() {
           ${bookTag(s)}
           ${fixedTag(s)}
           ${slotTag(s)}
+          ${isPendingChain(s) ? `<span class="tag tag-其他">🔗 分店待定·${getChainName(s)}</span>` : ''}
           ${s.link ? `<span style="cursor:pointer;color:var(--accent)" onclick='window.open(${JSON.stringify(s.link)},"_blank")'>🔗 來源</span>` : ''}
-          ${s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
+          ${!isPendingChain(s) && s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 48 ? s.addr.slice(0,48)+'…' : s.addr}</span>` : ''}
           ${s.hours ? `<span>${s.hours}</span>` : ''}
           ${s.note  ? `<span>${s.note}</span>`  : ''}
         </div>
       </div>
       <div class="spot-acts">
+        ${isPendingChain(s) ? `<button class="ic" onclick="suggestBranch(${s.id})">📍 最近分店</button>` : ''}
         <button class="ic" onclick='openMap(${JSON.stringify(s)})'>Maps</button>
         <button class="ic" onclick="editSpot(${s.id})">✎</button>
         <button class="ic del" onclick="deleteSpot(${s.id})">×</button>
@@ -1046,6 +1066,7 @@ const TW_DISTRICTS = {
 };
 
 function getCoord(spot) {
+  if (isPendingChain(spot)) return null;   // 分店未定，暫時冇座標
   const addr = spot.addr || '';
   let m = addr.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
   if (m) return { lat:+m[1], lng:+m[2] };
@@ -1058,6 +1079,163 @@ function getCoord(spot) {
     if (txt.includes(k)) return v;
   }
   return null;
+}
+
+/* ═══ 連鎖店：分店未定 → 按行程自動搵最近嗰間 ═══════════════ */
+
+const CHAIN_PREFIX = '🔗待定·';   // 存喺 addr 嘅 marker（唔使改 Supabase schema）
+function isPendingChain(s) {
+  return !!(s && typeof s.addr === 'string' && s.addr.startsWith(CHAIN_PREFIX));
+}
+function getChainName(s) {
+  return isPendingChain(s) ? s.addr.slice(CHAIN_PREFIX.length).trim() : '';
+}
+
+// 表單：剔咗「連鎖店」就唔使填地址
+function onChainToggle() {
+  const on   = document.getElementById('inp-chain').checked;
+  const addr = document.getElementById('inp-addr');
+  if (!addr) return;
+  addr.disabled = on;
+  addr.style.opacity = on ? 0.5 : 1;
+  addr.placeholder = on ? '分店未定 — 之後按行程自動搵最近嗰間'
+                        : '地址或貼上 Google Maps 連結';
+}
+
+function distMeters(a, b) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(b.lat - a.lat), dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function avgCoord(cs) {
+  return {
+    lat: cs.reduce((a, c) => a + c.lat, 0) / cs.length,
+    lng: cs.reduce((a, c) => a + c.lng, 0) / cs.length
+  };
+}
+
+// 計算「呢間連鎖店附近應該係邊」：優先用同一日前後嘅地點，其次同日中心，最後成個行程中心
+function anchorForChain(s) {
+  const all = spots.map(x => ({ x, c: getCoord(x) }))
+                   .filter(o => o.c && o.x.id !== s.id);
+  if (typeof s.day === 'number') {
+    const sameDay = all.filter(o => o.x.day === s.day).sort((a, b) => a.x.order - b.x.order);
+    if (sameDay.length) {
+      const prev = [...sameDay].filter(o => o.x.order <= s.order).pop();
+      const next = sameDay.find(o => o.x.order > s.order);
+      const picks = [prev, next].filter(Boolean).map(o => o.c);
+      return avgCoord(picks.length ? picks : sameDay.map(o => o.c));
+    }
+  }
+  if (all.length) return avgCoord(all.map(o => o.c));
+  return null;
+}
+
+// 按需載入 Google Maps JS（Places library）
+let _mapsPromise = null;
+function ensureMaps() {
+  if (_mapsPromise) return _mapsPromise;
+  if (!GOOGLE_MAPS_API_KEY) return Promise.reject(new Error('NO_KEY'));
+  _mapsPromise = new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`
+           + `&libraries=places&language=zh-TW&region=TW&loading=async`;
+    sc.async = true;
+    sc.onload = resolve;
+    sc.onerror = () => { _mapsPromise = null; reject(new Error('LOAD_FAIL')); };
+    document.head.appendChild(sc);
+  });
+  return _mapsPromise;
+}
+
+// 用 Places searchByText 喺 anchor 附近搵連鎖店，按距離排序
+async function searchNearestBranch(query, anchor) {
+  await ensureMaps();
+  const { Place } = await google.maps.importLibrary('places');
+  const resp = await Place.searchByText({
+    textQuery: query,
+    fields: ['displayName', 'formattedAddress', 'location'],
+    locationBias: { center: anchor, radius: 8000 },
+    maxResultCount: 12,
+    language: 'zh-TW',
+    region: 'TW'
+  });
+  const places = (resp.places || []).filter(p => p.location);
+  places.forEach(p => {
+    p._d = distMeters(anchor, { lat: p.location.lat(), lng: p.location.lng() });
+  });
+  places.sort((a, b) => a._d - b._d);
+  return places;
+}
+
+function applyBranch(s, top) {
+  const loc   = { lat: top.location.lat(), lng: top.location.lng() };
+  const bname = (top.displayName && top.displayName.text) || top.displayName || getChainName(s) || s.name;
+  const baddr = top.formattedAddress || '';
+  s.name = bname;
+  s.addr = `${baddr} @${loc.lat},${loc.lng}`.trim();   // 帶 @lat,lng 令 getCoord 認到
+  if (!s.link) s.link = `https://www.google.com/maps/search/?api=1&query=${loc.lat},${loc.lng}`;
+  return { bname, baddr, km: (top._d / 1000).toFixed(1) };
+}
+
+// 單間：建議最近分店
+async function suggestBranch(id) {
+  const s = spots.find(x => x.id === id);
+  if (!s || !isPendingChain(s)) return;
+  const query  = getChainName(s) || s.name;
+  const anchor = anchorForChain(s);
+  if (!anchor) {
+    alert('行程未有任何已知座標嘅地點，計唔到最近分店。\n先加多幾個有地址嘅地點，或者畀呢間連鎖店揀返一日。');
+    return;
+  }
+  let places;
+  try {
+    places = await searchNearestBranch(query, anchor);
+  } catch (e) {
+    if (e && e.message === 'NO_KEY')
+      alert('未設定 Google Maps API key。\n請喺檔案頂 GOOGLE_MAPS_API_KEY 填入 key（需啟用 Maps JavaScript API + Places API）。');
+    else
+      alert('搜尋分店失敗：' + ((e && e.message) || e));
+    return;
+  }
+  if (!places.length) {
+    alert(`搵唔到「${query}」附近嘅分店。\n試下改個名（例如用品牌全名）。`);
+    return;
+  }
+  const top = places[0];
+  const loc = { lat: top.location.lat(), lng: top.location.lng() };
+  const name = (top.displayName && top.displayName.text) || top.displayName || query;
+  const km = (top._d / 1000).toFixed(1);
+  if (!confirm(`最近分店：\n${name}\n${top.formattedAddress || ''}\n距離行程約 ${km} km\n\n用呢間？`)) return;
+  applyBranch(s, top);
+  save(); renderSpots();
+  if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
+}
+
+// 一鍵：所有待定連鎖店各自搵最近分店
+async function suggestAllBranches() {
+  const pend = spots.filter(isPendingChain);
+  if (!pend.length) { alert('冇待定分店嘅連鎖店。'); return; }
+  if (!GOOGLE_MAPS_API_KEY) {
+    alert('未設定 Google Maps API key。\n請喺檔案頂 GOOGLE_MAPS_API_KEY 填入 key（需啟用 Maps JavaScript API + Places API）。');
+    return;
+  }
+  if (!confirm(`為 ${pend.length} 間待定連鎖店各自搵最近分店並自動填入？`)) return;
+  let ok = 0;
+  for (const s of pend) {
+    const query  = getChainName(s) || s.name;
+    const anchor = anchorForChain(s);
+    if (!anchor) continue;
+    try {
+      const places = await searchNearestBranch(query, anchor);
+      if (places.length) { applyBranch(s, places[0]); ok++; }
+    } catch (e) { /* 跳過呢間 */ }
+  }
+  save(); renderSpots();
+  if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
+  alert(`✓ 已為 ${ok}/${pend.length} 間連鎖店搵到最近分店。`);
 }
 
 function kmeans(pts, k) {
@@ -1310,13 +1488,14 @@ function renderItinerary() {
     } else {
       html += daySpots.map(s => `
         <div class="tl-item rt-${s.type}">
-          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${bookTag(s)}${fixedTag(s)}${slotTag(s)}</div>
-          ${(s.addr && !/^https?:\/\//.test(s.addr)) || s.hours || s.note ? `<div class="tl-meta">
-            ${s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 60 ? s.addr.slice(0,60)+'…' : s.addr}</span>` : ''}
+          <div class="tl-name"><span>${s.name}</span><span class="tag tag-${s.type}">${s.type}</span>${bookTag(s)}${fixedTag(s)}${slotTag(s)}${isPendingChain(s) ? `<span class="tag tag-其他">🔗 分店待定</span>` : ''}</div>
+          ${(!isPendingChain(s) && s.addr && !/^https?:\/\//.test(s.addr)) || s.hours || s.note ? `<div class="tl-meta">
+            ${!isPendingChain(s) && s.addr && !/^https?:\/\//.test(s.addr) ? `<span>${s.addr.length > 60 ? s.addr.slice(0,60)+'…' : s.addr}</span>` : ''}
             ${s.hours ? `<span>${s.hours}</span>` : ''}
             ${s.note  ? `<span>${s.note}</span>`  : ''}
           </div>` : ''}
           <div class="tl-actions">
+            ${isPendingChain(s) ? `<button class="map-btn" onclick="suggestBranch(${s.id})">📍 最近分店</button>` : ''}
             <button class="map-btn" onclick="moveSpot(${s.id},-1)">↑ 上移</button>
             <button class="map-btn" onclick="moveSpot(${s.id},1)">↓ 下移</button>
             <button class="map-btn" onclick='openMap(${JSON.stringify(s)})'>Maps →</button>
