@@ -722,7 +722,9 @@ main { overflow-x: hidden; }
     <button class="sort-lnk" id="drink-cancel" onclick="cancelDrinkEdit()" style="display:none">取消編輯</button>
   </div>
   <div class="lbl" style="margin-top:36px">想飲清單</div>
-  <div class="shop-w" style="margin:-8px 0 18px">💡 唔使釘死分店。喺街想飲就撳「🔍 搵附近分店」，地圖會用你當時位置顯示最就腳嗰間。</div>
+  <div class="shop-w" style="margin:-8px 0 12px">💡 唔使釘死分店。喺街想飲就撳下面「我要飲肥仔水！」，會用你當時位置，喺成個清單度搵出邊個牌子邊一間最就腳。</div>
+  <button class="btn-add" style="width:100%;margin:0 0 10px;font-size:15px" onclick="wantDrinkNow()">🧋 我要飲肥仔水！（跨牌子搵最就腳）</button>
+  <div id="drink-result" style="display:none;margin:0 0 18px"></div>
   <div class="shop-prog" id="drink-progress">0 / 0 已試</div>
   <div id="drinkGrid"></div>
 </main>
@@ -1729,6 +1731,70 @@ async function deleteDrink(id) {
 // 搵附近分店：開 Google Maps 搜尋品牌，手機會用當時位置顯示最近嗰間
 function findDrinkBranch(name) {
   window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}`, '_blank');
+}
+
+// 攞當時位置（瀏覽器定位）
+function getCurrentLoc() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject(new Error('NO_GEO'));
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      err => reject(err),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  });
+}
+
+function fmtDist(m) { return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`; }
+
+// 「我要飲肥仔水！」：跨清單所有牌子，用當時位置搵最就腳嗰間
+async function wantDrinkNow() {
+  const box = document.getElementById('drink-result');
+  box.style.display = 'block';
+  if (!drinks.length) { box.innerHTML = '<div class="shop-w">清單仲未有手搖品牌。</div>'; return; }
+  if (!GOOGLE_MAPS_API_KEY) { box.innerHTML = '<div class="shop-w">⚠️ 未設定 Google Maps API key。</div>'; return; }
+
+  box.innerHTML = '<div class="shop-w">⏳ 攞緊你嘅位置…（瀏覽器問你定位權限就撳允許）</div>';
+  let anchor, usedLoc = '當時位置';
+  try {
+    anchor = await getCurrentLoc();
+  } catch (e) {
+    const cs = spots.map(getCoord).filter(Boolean);
+    if (cs.length) { anchor = avgCoord(cs); usedLoc = '行程中心（攞唔到定位）'; }
+  }
+  if (!anchor) { box.innerHTML = '<div class="shop-w">⚠️ 攞唔到你嘅位置，行程又未有座標。請喺瀏覽器允許定位再試。</div>'; return; }
+
+  box.innerHTML = `<div class="shop-w">⏳ 用緊「${usedLoc}」喺 ${drinks.length} 個牌子度搵最就腳…</div>`;
+  const results = [];
+  for (const d of drinks) {
+    try {
+      const places = await searchNearestBranch(d.name, anchor);
+      const hit = places.find(p => p._brand);   // 只計真係同牌子嘅
+      if (hit) {
+        results.push({
+          brand: d.name, note: d.note,
+          branch: String((hit.displayName && hit.displayName.text) || hit.displayName || d.name),
+          addr: hit.formattedAddress || '', dist: hit._d,
+          loc: { lat: hit.location.lat(), lng: hit.location.lng() }
+        });
+      }
+    } catch (e) { /* 跳過呢個牌子 */ }
+  }
+  if (!results.length) { box.innerHTML = '<div class="shop-w">⚠️ 附近搵唔到清單入面任何牌子嘅分店。</div>'; return; }
+  results.sort((a, b) => a.dist - b.dist);
+
+  const dirUrl = r => `https://www.google.com/maps/dir/?api=1&origin=${anchor.lat},${anchor.lng}&destination=${r.loc.lat},${r.loc.lng}&travelmode=walking`;
+  const rows = results.map((r, i) => {
+    const top = i === 0;
+    return `<div class="shop-row" style="${top ? 'background:rgba(196,122,26,0.12);border-left:4px solid #c47a1a;padding-left:10px' : ''}">
+      <div style="flex:1;min-width:0">
+        <div class="shop-n">${top ? '🏆 ' : `${i + 1}. `}${r.brand} <span style="color:#c47a1a;font-weight:400">· ${fmtDist(r.dist)}</span></div>
+        <div class="shop-w">${r.branch}${r.note ? ` ・ 想飲：${r.note}` : ''}</div>
+        <span class="shop-w" style="cursor:pointer;color:var(--accent);display:inline-block;margin-top:5px;border:1px solid rgba(92,122,82,0.4);padding:3px 10px" onclick='window.open(${JSON.stringify(dirUrl(r))},"_blank")'>🚶 行去呢間</span>
+      </div>
+    </div>`;
+  }).join('');
+  box.innerHTML = `<div class="shop-w" style="margin-bottom:8px">📍 由「${usedLoc}」計，最就腳排名：</div>${rows}`;
 }
 function renderDrinks() {
   const tried = drinks.filter(d => d.tried).length;
