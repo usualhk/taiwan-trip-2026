@@ -1325,7 +1325,19 @@ function kmeans(pts, k) {
 
 async function autoAssignDays(silent, skipResolve) {
   const autoSpots = spots.filter(s => s.day === 'auto');
-  if (!autoSpots.length) { if (!silent) alert('冇地點要編排。先喺日期揀「🤖 由你決定」。'); return; }
+  if (!autoSpots.length) {
+    // 冇待編排地點，但可能有待定連鎖店要搵分店
+    if (!skipResolve) {
+      const n = await resolveChains(s => isPendingChain(s) && !isLockedSpot(s), silent);
+      if (n) {
+        save(); renderSpots();
+        if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
+        if (!silent) { alert(`✓ 已幫 ${n} 間待定連鎖店搵到最近分店。`); return; }
+      }
+    }
+    if (!silent) alert('冇地點要編排。先喺日期揀「🤖 由你決定」。');
+    return;
+  }
 
   autoSpots.forEach(s => { s._c = getCoord(s); });
   const withC = autoSpots.filter(s => s._c);
