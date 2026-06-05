@@ -1164,7 +1164,16 @@ function ensureMaps() {
     sc.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}`
            + `&libraries=places&language=zh-TW&region=TW&loading=async`;
     sc.async = true;
-    sc.onload = resolve;
+    sc.onload = () => {
+      // 等到 importLibrary 真係 ready 先 resolve（避免 race：第一次搜尋失敗）
+      let tries = 0;
+      const check = () => {
+        if (window.google && google.maps && typeof google.maps.importLibrary === 'function') return resolve();
+        if (++tries > 120) return reject(new Error('MAPS_TIMEOUT'));
+        setTimeout(check, 50);
+      };
+      check();
+    };
     sc.onerror = () => { _mapsPromise = null; reject(new Error('LOAD_FAIL')); };
     document.head.appendChild(sc);
   });
@@ -1184,10 +1193,15 @@ async function searchNearestBranch(query, anchor) {
     region: 'TW'
   });
   const places = (resp.places || []).filter(p => p.location);
+  const nq = (query || '').replace(/\s+/g, '');
+  const nameOf = p => String((p.displayName && p.displayName.text) || p.displayName || '').replace(/\s+/g, '');
+  const isSameBrand = p => { const n = nameOf(p); return !!nq && (n.includes(nq) || (nq.length >= 3 && n.includes(nq.slice(0, 3)))); };
   places.forEach(p => {
     p._d = distMeters(anchor, { lat: p.location.lat(), lng: p.location.lng() });
+    p._brand = isSameBrand(p);
   });
-  places.sort((a, b) => a._d - b._d);
+  // 優先同品牌，再按距離（避免揀到附近嘅其他品牌）
+  places.sort((a, b) => (b._brand - a._brand) || (a._d - b._d));
   return places;
 }
 
@@ -1477,6 +1491,7 @@ async function reArrangeFlexible() {
 
   // 順便幫所有連鎖店（連已定嘅）按而家嘅日子重揾最就腳分店（已訂位/固定時間嘅唔郁）
   await resolveChains(s => isChain(s) && !isLockedSpot(s), false);
+  const stuck = spots.filter(isPendingChain).map(s => getChainName(s));
 
   // 每日重新排序：先按時段（早餐前、晚餐後），鎖定有固定時間嘅按時間
   [1,2,3,4,5].forEach(d => {
@@ -1492,7 +1507,8 @@ async function reArrangeFlexible() {
 
   save(); renderSpots();
   if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
-  alert('✓ 已重新編排（已訂位 / 固定時間嘅景點保持唔變）');
+  alert('✓ 已重新編排（已訂位 / 固定時間嘅景點保持唔變）'
+        + (stuck.length ? `\n\n⚠️ 呢啲連鎖店暫時搵唔到分店，仍然待定：${stuck.join('、')}\n（可能個名太特別，試下改用品牌全名）` : ''));
 }
 
 function dayRouteUrl(daySpots) {
