@@ -761,7 +761,24 @@ const GOOGLE_MAPS_API_KEY = 'AIzaSyAcHLf9OGdBYGDYRLWYMxXaoe8x58lhXlc';
 let spots = [];
 let shopItems = [];
 let drinks = [];
+let cfg = { reservedDays: [] };   // 設定（例如預留邊日），存喺 Supabase 一個隱藏 config row
 let currentFilter = 'all';
+
+const CFG_ID = 1;   // config 用嘅固定 id（真實景點用 Date.now()，唔會撞）
+function isReservedDay(d) { return cfg.reservedDays.includes(Number(d)); }
+function availableDays() { const a = [1,2,3,4,5].filter(d => !isReservedDay(d)); return a.length ? a : [1,2,3,4,5]; }
+async function saveCfg() {
+  if (!dbReady()) return;
+  await sb.from('spots').upsert([{ id: CFG_ID, name: '__CONFIG__', addr: '', type: '其他', day: 'auto', note: JSON.stringify(cfg), hours: '', link: '', book: null, fixed: false, slot: null, ord: 0 }]);
+}
+async function toggleReserveDay(d) {
+  d = Number(d);
+  if (cfg.reservedDays.includes(d)) cfg.reservedDays = cfg.reservedDays.filter(x => x !== d);
+  else cfg.reservedDays = [...cfg.reservedDays, d];
+  await saveCfg();
+  renderSpots();
+  if (document.getElementById('tab-itinerary').classList.contains('active')) renderItinerary();
+}
 let currentShopFilter = 'all';
 let editingSpotId = null;
 let editingShopId = null;
@@ -829,7 +846,12 @@ async function loadAll() {
     sb.from('shop_items').select('*'),
     sb.from('drinks').select('*')
   ]);
-  spots     = (sp || []).map(rowToSpot);
+  const allSpots = (sp || []).map(rowToSpot);
+  const cfgRow = allSpots.find(s => s.name === '__CONFIG__');
+  try { cfg = cfgRow && cfgRow.note ? Object.assign({ reservedDays: [] }, JSON.parse(cfgRow.note)) : { reservedDays: [] }; }
+  catch (e) { cfg = { reservedDays: [] }; }
+  if (!Array.isArray(cfg.reservedDays)) cfg.reservedDays = [];
+  spots     = allSpots.filter(s => s.name !== '__CONFIG__');   // 隱藏 config row，唔當景點
   shopItems = (sh || []).map(rowToShop);
   drinks    = (dr || []).map(rowToDrink);
   renderSpots();
@@ -1371,8 +1393,10 @@ async function autoAssignDays(silent, skipResolve) {
   const withC = autoSpots.filter(s => s._c);
   const noC = autoSpots.filter(s => !s._c);
 
+  const TD = availableDays();   // 可用日（跳過已預留嘅）
+
   const centroids = {};
-  for (let d = 1; d <= 5; d++) {
+  TD.forEach(d => {
     const cs = spots.filter(s => s.day === d).map(getCoord).filter(c => c);
     if (cs.length) {
       centroids[d] = {
@@ -1380,25 +1404,25 @@ async function autoAssignDays(silent, skipResolve) {
         lng: cs.reduce((a, c) => a + c.lng, 0) / cs.length
       };
     }
-  }
+  });
   const anchorCount = Object.keys(centroids).length;
 
-  if (anchorCount === 5) {
+  if (anchorCount === TD.length) {
     withC.forEach(s => { s.day = nearestDay(s._c, centroids); });
-  } else if (withC.length >= 5) {
-    const km = kmeans(withC.map(s => s._c), 5);
+  } else if (withC.length >= TD.length) {
+    const km = kmeans(withC.map(s => s._c), TD.length);
     const order = km.centroids.map((c, i) => ({ c, i }))
       .sort((a, b) => a.c.lng - b.c.lng || a.c.lat - b.c.lat);
     const cMap = {};
-    order.forEach((x, i) => { cMap[x.i] = i + 1; });
+    order.forEach((x, i) => { cMap[x.i] = TD[i]; });
     withC.forEach((s, i) => { s.day = cMap[km.assignments[i]]; });
   } else {
     withC.sort((a, b) => a._c.lng - b._c.lng || a._c.lat - b._c.lat);
-    withC.forEach((s, i) => { s.day = i + 1; });
+    withC.forEach((s, i) => { s.day = TD[i % TD.length]; });
   }
 
   noC.forEach(s => {
-    const counts = [1,2,3,4,5].map(d => ({ d, n: spots.filter(x => x.day === d).length }));
+    const counts = TD.map(d => ({ d, n: spots.filter(x => x.day === d).length }));
     counts.sort((a, b) => a.n - b.n);
     s.day = counts[0].d;
   });
@@ -1437,6 +1461,8 @@ function enforceDaySlotRules(movable) {
     if (s.slot === 'am' && s.day === 1) allowed = [2, 3, 4, 5];
     else if (s.slot === 'pm' && s.day === 5) allowed = [1, 2, 3, 4];
     if (!allowed) return;
+    allowed = allowed.filter(d => !isReservedDay(d));
+    if (!allowed.length) return;
     const c = getCoord(s);
     const cents = {};
     allowed.forEach(d => {
@@ -1463,19 +1489,21 @@ function isLockedSpot(s) {
 
 // 重新編排：保留已訂位 / 固定時間嘅景點唔郁，其餘按距離重新分配
 async function reArrangeFlexible() {
-  const flex = spots.filter(s => !isLockedSpot(s));
-  if (!flex.length) { alert('冇景點需要重新編排（全部都已訂位或有固定時間）。'); return; }
-  if (!confirm(`會保留已訂位 / 有固定時間嘅景點唔郁，其餘 ${flex.length} 個按距離重新分配。繼續？`)) return;
+  // 預留日嘅景點當鎖定，唔郁
+  const flex = spots.filter(s => !isLockedSpot(s) && !isReservedDay(s.day));
+  if (!flex.length) { alert('冇景點需要重新編排（全部都已訂位 / 固定時間 / 喺預留日）。'); return; }
+  if (!confirm(`會保留已訂位 / 固定時間 / 預留日嘅景點唔郁，其餘 ${flex.length} 個按距離重新分配。繼續？`)) return;
 
   const avg = cs => ({ lat: cs.reduce((a,c)=>a+c.lat,0)/cs.length, lng: cs.reduce((a,c)=>a+c.lng,0)/cs.length });
+  const TD = availableDays();   // 可用日（跳過已預留嘅）
 
-  // 每日錨點：優先用鎖定景點，冇就用嗰日其餘景點
+  // 每日錨點：優先用鎖定景點，冇就用嗰日其餘景點（只計可用日）
   const centroids = {};
-  for (let d = 1; d <= 5; d++) {
+  TD.forEach(d => {
     let cs = spots.filter(s => s.day === d && isLockedSpot(s)).map(getCoord).filter(Boolean);
     if (!cs.length) cs = spots.filter(s => s.day === d).map(getCoord).filter(Boolean);
     if (cs.length) centroids[d] = avg(cs);
-  }
+  });
 
   flex.forEach(s => { s._c = getCoord(s); });
   const withC = flex.filter(s => s._c);
@@ -1483,19 +1511,19 @@ async function reArrangeFlexible() {
 
   if (Object.keys(centroids).length) {
     withC.forEach(s => { s.day = nearestDay(s._c, centroids); });
-  } else if (withC.length >= 5) {
-    const km = kmeans(withC.map(s => s._c), 5);
+  } else if (withC.length >= TD.length) {
+    const km = kmeans(withC.map(s => s._c), TD.length);
     const order = km.centroids.map((c, i) => ({ c, i })).sort((a, b) => a.c.lng - b.c.lng || a.c.lat - b.c.lat);
-    const cMap = {}; order.forEach((x, i) => { cMap[x.i] = i + 1; });
+    const cMap = {}; order.forEach((x, i) => { cMap[x.i] = TD[i]; });
     withC.forEach((s, i) => { s.day = cMap[km.assignments[i]]; });
   } else {
     withC.sort((a, b) => a._c.lng - b._c.lng || a._c.lat - b._c.lat);
-    withC.forEach((s, i) => { s.day = (i % 5) + 1; });
+    withC.forEach((s, i) => { s.day = TD[i % TD.length]; });
   }
 
-  // 冇座標嘅放最少景點嗰日
+  // 冇座標嘅放最少景點嗰日（只計可用日）
   noC.forEach(s => {
-    const counts = [1,2,3,4,5].map(d => ({ d, n: spots.filter(x => x.day === d).length }));
+    const counts = TD.map(d => ({ d, n: spots.filter(x => x.day === d).length }));
     counts.sort((a, b) => a.n - b.n);
     s.day = counts[0].d;
   });
@@ -1578,8 +1606,11 @@ function renderItinerary() {
       <div class="itin-hd">
         <span class="day-pill">Day ${d}</span>
         <span class="day-datestr">${dayDates[d]}</span>
+        ${isReservedDay(d) ? `<span class="tag tag-肥仔水">📌 已預留</span>` : ''}
         ${routeUrl ? `<button class="day-route" onclick="window.open('${routeUrl}','_blank')">🗺️ 開Maps</button>` : ''}
+        <button class="day-route" onclick="toggleReserveDay(${d})" title="預留咗嘅日，自動／重新編排都唔會擺景點入去">${isReservedDay(d) ? '↩︎ 取消預留' : '📌 預留呢日'}</button>
       </div>
+      ${isReservedDay(d) ? `<div class="shop-w" style="margin:2px 0 8px;color:#c47a1a">📌 呢日已預留 — 自動／重新編排唔會擺景點入嚟，你自己手動加（例如北海岸行程）。</div>` : ''}
       ${embedUrl ? `<div class="day-map-wrap"><iframe class="day-map-iframe" src="${embedUrl}" loading="lazy" allowfullscreen></iframe></div>` : ''}`;
 
     if (d === 1) {
