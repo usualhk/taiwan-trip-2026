@@ -723,6 +723,18 @@ main { overflow-x: hidden; }
   </div>
   <div class="lbl" style="margin-top:36px">想飲清單</div>
   <div class="shop-w" style="margin:-8px 0 12px">💡 唔使釘死分店。喺街想飲就撳下面「我要飲肥仔水！」，會用你當時位置，喺成個清單度搵出邊個牌子邊一間最就腳。</div>
+  <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0 0 8px;font-size:13px;color:var(--ink-2)">
+    <label style="display:flex;align-items:center;gap:6px">步行範圍：
+      <select id="drink-walkmin" style="padding:4px 8px">
+        <option value="0" selected>不限</option>
+        <option value="5">5 分鐘內</option>
+        <option value="10">10 分鐘內</option>
+        <option value="15">15 分鐘內</option>
+        <option value="20">20 分鐘內</option>
+      </select>
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="drink-skiptried" checked style="width:15px;height:15px;cursor:pointer"> 跳過已試 ✓</label>
+  </div>
   <button class="btn-add" style="width:100%;margin:0 0 10px;font-size:15px" onclick="wantDrinkNow()">🧋 我要飲肥仔水！（跨牌子搵最就腳）</button>
   <div id="drink-result" style="display:none;margin:0 0 18px"></div>
   <div class="shop-prog" id="drink-progress">0 / 0 已試</div>
@@ -1754,6 +1766,11 @@ async function wantDrinkNow() {
   if (!drinks.length) { box.innerHTML = '<div class="shop-w">清單仲未有手搖品牌。</div>'; return; }
   if (!GOOGLE_MAPS_API_KEY) { box.innerHTML = '<div class="shop-w">⚠️ 未設定 Google Maps API key。</div>'; return; }
 
+  const maxMin    = parseInt(document.getElementById('drink-walkmin').value) || 0;   // 0 = 不限
+  const skipTried = document.getElementById('drink-skiptried').checked;
+  const pool = drinks.filter(d => skipTried ? !d.tried : true);
+  if (!pool.length) { box.innerHTML = '<div class="shop-w">冇符合條件嘅牌子（可能全部已試 ✓）。</div>'; return; }
+
   box.innerHTML = '<div class="shop-w">⏳ 攞緊你嘅位置…（瀏覽器問你定位權限就撳允許）</div>';
   let anchor, usedLoc = '當時位置';
   try {
@@ -1764,9 +1781,9 @@ async function wantDrinkNow() {
   }
   if (!anchor) { box.innerHTML = '<div class="shop-w">⚠️ 攞唔到你嘅位置，行程又未有座標。請喺瀏覽器允許定位再試。</div>'; return; }
 
-  box.innerHTML = `<div class="shop-w">⏳ 用緊「${usedLoc}」喺 ${drinks.length} 個牌子度搵最就腳…</div>`;
+  box.innerHTML = `<div class="shop-w">⏳ 用緊「${usedLoc}」喺 ${pool.length} 個牌子度搵最就腳…</div>`;
   const results = [];
-  for (const d of drinks) {
+  for (const d of pool) {
     try {
       const places = await searchNearestBranch(d.name, anchor);
       const hit = places.find(p => p._brand);   // 只計真係同牌子嘅
@@ -1781,20 +1798,29 @@ async function wantDrinkNow() {
     } catch (e) { /* 跳過呢個牌子 */ }
   }
   if (!results.length) { box.innerHTML = '<div class="shop-w">⚠️ 附近搵唔到清單入面任何牌子嘅分店。</div>'; return; }
+  // 估步行分鐘：直線距離 ×1.3（繞路）÷ 80m/分鐘
+  results.forEach(r => { r.walkMin = Math.max(1, Math.round(r.dist * 1.3 / 80)); });
   results.sort((a, b) => a.dist - b.dist);
+  const shown = maxMin ? results.filter(r => r.walkMin <= maxMin) : results;
+  if (!shown.length) {
+    const nearest = results[0];
+    box.innerHTML = `<div class="shop-w">🚶 ${maxMin} 分鐘步行範圍內冇牌子。最近嗰間係 <b>${nearest.brand}</b>（約 ${nearest.walkMin} 分鐘・${fmtDist(nearest.dist)}）。放寬「步行範圍」再試？</div>`;
+    return;
+  }
 
   const dirUrl = r => `https://www.google.com/maps/dir/?api=1&origin=${anchor.lat},${anchor.lng}&destination=${r.loc.lat},${r.loc.lng}&travelmode=walking`;
-  const rows = results.map((r, i) => {
+  const rows = shown.map((r, i) => {
     const top = i === 0;
     return `<div class="shop-row" style="${top ? 'background:rgba(196,122,26,0.12);border-left:4px solid #c47a1a;padding-left:10px' : ''}">
       <div style="flex:1;min-width:0">
-        <div class="shop-n">${top ? '🏆 ' : `${i + 1}. `}${r.brand} <span style="color:#c47a1a;font-weight:400">· ${fmtDist(r.dist)}</span></div>
+        <div class="shop-n">${top ? '🏆 ' : `${i + 1}. `}${r.brand} <span style="color:#c47a1a;font-weight:400">· 🚶 約 ${r.walkMin} 分鐘（${fmtDist(r.dist)}）</span></div>
         <div class="shop-w">${r.branch}${r.note ? ` ・ 想飲：${r.note}` : ''}</div>
         <span class="shop-w" style="cursor:pointer;color:var(--accent);display:inline-block;margin-top:5px;border:1px solid rgba(92,122,82,0.4);padding:3px 10px" onclick='window.open(${JSON.stringify(dirUrl(r))},"_blank")'>🚶 行去呢間</span>
       </div>
     </div>`;
   }).join('');
-  box.innerHTML = `<div class="shop-w" style="margin-bottom:8px">📍 由「${usedLoc}」計，最就腳排名：</div>${rows}`;
+  const scopeTxt = maxMin ? `步行 ${maxMin} 分鐘內` : '全部';
+  box.innerHTML = `<div class="shop-w" style="margin-bottom:8px">📍 由「${usedLoc}」計，${scopeTxt}最就腳排名：</div>${rows}`;
 }
 function renderDrinks() {
   const tried = drinks.filter(d => d.tried).length;
